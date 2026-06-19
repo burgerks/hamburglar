@@ -1,0 +1,1250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Probabilistic Bandit Task</title>
+
+<!-- Self-contained: jsPsych 7.3.4 + plugins loaded from the jsDelivr CDN
+     (pinned to exact versions, explicit /dist/index.browser.min.js builds —
+     the bare @version form resolves to the CommonJS build, which lacks the
+     browser globals). No local jspsych/ folder required. -->
+<script src="https://cdn.jsdelivr.net/npm/jspsych@7.3.4/dist/index.browser.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/jspsych@7.3.4/css/jspsych.css">
+<script src="https://cdn.jsdelivr.net/npm/@jspsych/plugin-html-keyboard-response@1.1.3/dist/index.browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@jspsych/plugin-survey-text@1.1.3/dist/index.browser.min.js"></script>
+
+<style>
+:root {
+  --bg:      #16161e;
+  --bg2:     #1a1b26;
+  --fg:      #ffffff;
+  --fg-dim:  #8b95b8;
+  --accent:  #7aa2f7;
+  --gold:    #e0af68;
+  --green:   #9ece6a;
+  --red:     #f7768e;
+  --neutral: #8b95b8;
+  --a:       #5B8DD9;
+  --b:       #E8845C;
+  --c:       #56B68B;
+}
+
+body, .jspsych-display-element {
+  background: var(--bg) !important;
+  color: var(--fg) !important;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
+}
+.jspsych-content-wrapper { background: var(--bg) !important; }
+.jspsych-content { max-width: 900px !important; padding-top: 64px !important; }
+
+/* ── Header ── */
+#bandit-header {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 44px; background: var(--bg2);
+  display: none; align-items: center;
+  justify-content: space-between;
+  padding: 0 28px; z-index: 9999;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-size: 17px; font-weight: bold;
+  border-bottom: 1px solid #2a2b3d;
+}
+#bandit-header.visible { display: flex; }
+#hdr-trial { color: var(--fg-dim); }
+#hdr-score { color: var(--gold); }
+#progress-wrap {
+  position: fixed; top: 44px; left: 0; right: 0;
+  height: 3px; background: #2a2b3d; z-index: 9999; display: none;
+}
+#progress-wrap.visible { display: block; }
+#progress-fill { height: 3px; background: var(--accent); width: 0%; transition: width 0.4s ease; }
+
+/* ── PID screen ── */
+.bandit-title { font-size: 30px; font-weight: bold; color: var(--accent); margin-bottom: 6px; text-align: center; }
+.bandit-subtitle { font-size: 17px; color: var(--fg-dim); text-align: center; margin-bottom: 32px; }
+.jspsych-survey-text-preamble { margin-bottom: 0 !important; }
+.jspsych-survey-text input[type=text] {
+  background: var(--bg2) !important; color: var(--fg) !important;
+  border: 1px solid var(--fg-dim) !important; border-radius: 6px !important;
+  padding: 8px 16px !important; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
+  font-size: 19px !important; text-align: center !important;
+  width: 220px !important; outline: none !important; display: block; margin: 0 auto;
+}
+.jspsych-survey-text input[type=text]:focus {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 2px rgba(122,162,247,0.2) !important;
+}
+.jspsych-survey-text label {
+  color: var(--fg-dim) !important; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
+  font-size: 18px !important; display: block; text-align: center; margin-bottom: 6px;
+}
+.jspsych-survey-text .jspsych-btn {
+  background: var(--accent) !important; color: var(--bg) !important;
+  border: none !important; border-radius: 6px !important;
+  padding: 10px 34px !important; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
+  font-size: 18px !important; font-weight: bold !important;
+  cursor: pointer !important; margin-top: 20px !important;
+  display: block; margin-left: auto; margin-right: auto;
+}
+.jspsych-survey-text .jspsych-btn:hover { filter: brightness(1.1); }
+
+/* ── Instructions / buttons ── */
+.instr-title { font-size: 26px; font-weight: bold; color: var(--accent); margin-bottom: 20px; text-align: center; }
+.instr-body { font-size: 18px; line-height: 1.6; color: var(--fg); max-width: 760px; margin: 0 auto 28px auto; text-align: left; }
+.bandit-btn {
+  display: inline-block; background: var(--green); color: var(--bg);
+  border: none; border-radius: 6px; padding: 12px 40px;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 19px; font-weight: bold;
+  cursor: pointer; transition: filter .15s;
+}
+.bandit-btn:hover { filter: brightness(1.1); }
+
+/* ── Choice prompt ── */
+.choice-prompt { font-size: 22px; font-weight: bold; color: var(--fg); margin-bottom: 32px; text-align: center; }
+
+/* ── Slot machine grid ── */
+.slot-grid { display: flex; gap: 24px; justify-content: center; align-items: flex-end; margin-top: 8px; }
+.slot-machine {
+  display: flex; flex-direction: column; align-items: center;
+  cursor: pointer; user-select: none; transition: filter .15s;
+}
+.slot-machine:hover .slot-body { filter: brightness(1.15); }
+.slot-machine.disabled { cursor: default; pointer-events: none; }
+
+/* ── Animations ── */
+@keyframes leverPull {
+  0%   { transform: rotate(0deg); }
+  30%  { transform: rotate(45deg); }
+  60%  { transform: rotate(-10deg); }
+  100% { transform: rotate(0deg); }
+}
+@keyframes reelSpin {
+  0%   { transform: translateY(0); }
+  25%  { transform: translateY(-8px); }
+  50%  { transform: translateY(4px); }
+  75%  { transform: translateY(-4px); }
+  100% { transform: translateY(0); }
+}
+@keyframes machineShake {
+  0%,100% { transform: translateX(0); }
+  20%     { transform: translateX(-3px); }
+  40%     { transform: translateX(3px); }
+  60%     { transform: translateX(-2px); }
+  80%     { transform: translateX(2px); }
+}
+.slot-machine.pulling .lever-arm  { animation: leverPull 0.4s ease-in-out; }
+.slot-machine.pulling .reel-strip { animation: reelSpin 0.4s ease-in-out; }
+.slot-machine.pulling .slot-body  { animation: machineShake 0.4s ease-in-out; }
+
+/* ── Symbols ── */
+.celtic {
+  width: 140px; height: 140px;          /* square box */
+  padding: 14px; box-sizing: border-box;
+  background: #fbfbfd;                   /* near-white */
+  border: 2px solid #d0d0d8;
+  border-radius: 10px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.45);
+  transition: border-color .15s, box-shadow .15s;
+  display: flex; align-items: center; justify-content: center;
+}
+.celtic-symbol { width: 100%; height: 100%; object-fit: contain; display: block; }
+.slot-machine:hover .celtic {
+  border-color: #6f9bd6;
+  box-shadow: 0 0 0 3px rgba(80,120,200,0.18), 0 2px 8px rgba(0,0,0,0.5);
+}
+
+/* ── Reward feedback badge ── */
+.slot-reward {
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-size: 24px; font-weight: bold;
+  margin-top: 20px; min-height: 36px;
+}
+.slot-reward.win     { color: var(--green); }
+.slot-reward.loss    { color: var(--red); }
+.slot-reward.neutral { color: var(--neutral); }
+.slot-reward.hidden  { opacity: 0; }
+
+/* ── Inactivity nudge ── */
+#inactivity-nudge {
+  display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(22,22,30,0.92); z-index: 99999;
+  align-items: center; justify-content: center;
+}
+#inactivity-nudge.visible { display: flex; }
+.nudge-box {
+  background: var(--bg2); border: 2px solid var(--gold);
+  border-radius: 12px; padding: 40px 48px; text-align: center; max-width: 420px;
+}
+.nudge-title { font-size: 24px; font-weight: bold; color: var(--gold); margin-bottom: 12px; }
+.nudge-body  { font-size: 18px; line-height: 1.75; color: var(--fg); margin-bottom: 24px; }
+.nudge-timer { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 17px; color: var(--fg-dim); margin-top: 14px; }
+.nudge-timer.urgent { color: var(--red); }
+.nudge-btn {
+  background: var(--gold); color: var(--bg); border: none; border-radius: 6px;
+  padding: 10px 32px; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 18px; font-weight: bold;
+  cursor: pointer; transition: filter .15s;
+}
+.nudge-btn:hover { filter: brightness(1.1); }
+
+/* ── End screen ── */
+.end-wrap  { text-align: center; padding-top: 20px; }
+.end-title { font-size: 40px; font-weight: bold; color: var(--green); margin-bottom: 14px; }
+.end-score { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 22px; color: var(--gold); margin-bottom: 10px; }
+.end-stat  { font-size: 17px; color: var(--fg-dim); margin: 4px 0; }
+.end-note  { font-size: 17px; color: var(--accent); margin-top: 16px; }
+.end-btn {
+  margin-top: 28px; padding: 12px 38px; background: var(--accent); color: var(--bg);
+  border: none; border-radius: 6px; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-size: 19px; font-weight: bold; cursor: pointer; transition: filter .15s;
+}
+.end-btn:hover { filter: brightness(1.1); }
+
+/* ── Bandit feedback: points centered, four tilted corner images ── */
+.fb-wrap   { position: relative; width: 100%; min-height: 420px; }
+.fb-center { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-size: 56px; font-weight: bold; white-space: nowrap; }
+.fb-center.win  { color: var(--green); }
+.fb-center.loss { color: var(--red); }
+.fb-corner { position: absolute; }
+.fb-tl { top: 6%;  left: 9%; }   .fb-tr { top: 6%;  right: 9%; }
+.fb-bl { bottom: 6%; left: 9%; } .fb-br { bottom: 6%; right: 9%; }
+.fb-food { width: 150px; height: 150px; object-fit: cover; border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.5); display: block; }
+.fb-sad  { font-size: 90px; line-height: 1; }
+.img-placeholder { display: flex; align-items: center; justify-content: center;
+  background: var(--bg2); border: 1px dashed var(--fg-dim); color: var(--fg-dim);
+  font-size: 13px; text-transform: uppercase; letter-spacing: 1px; }
+
+/* ── Bonus round (mini-MID) ── */
+.bonus-stage { display: flex; flex-direction: column; align-items: center;
+  justify-content: center; min-height: 440px; text-align: center; }
+.bonus-intro { font-size: 40px; font-weight: bold; color: var(--gold); }
+.bonus-cue { max-width: 50vw; max-height: 50vh; width: auto; height: auto;
+  object-fit: contain; border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.5); }
+.bonus-cue.img-placeholder { width: 50vw; height: 36vh; }
+.bonus-fix    { font-size: 72px; font-weight: bold; color: var(--fg); }
+.bonus-square { width: 150px; height: 150px; background: var(--fg); border-radius: 6px; }
+.bonus-fb     { font-size: 44px; font-weight: bold; }
+.bonus-fb.win  { color: var(--green); }
+.bonus-fb.warn { color: var(--gold); }
+.bonus-fb-pts { font-size: 34px; font-weight: bold; color: var(--green); margin-top: 12px; }
+.bonus-fb-sub { font-size: 20px; color: var(--fg-dim); margin-top: 10px; }
+
+/* ── Photodiode sync square (only shown when CFG.PHOTODIODE) ── */
+#photodiode { position: fixed; top: 0; left: 0; width: 60px; height: 60px;
+  background: #000; z-index: 100000; display: none; }
+#photodiode.on { display: block; }
+</style>
+</head>
+<body>
+
+<div id="bandit-header">
+  <span id="hdr-trial">Trial 1 / 200</span>
+  <span id="hdr-score">Score: 0 pts</span>
+</div>
+<div id="progress-wrap"><div id="progress-fill"></div></div>
+
+<!-- Photodiode sync square (hidden unless CFG.PHOTODIODE is true). For iEEG /
+     direct-recording sessions, a light sensor over this square captures true
+     event-onset times for cue, target, and feedback. -->
+<div id="photodiode"></div>
+
+<!-- jsPsych renders into this dedicated target so it never wipes the
+     persistent header / progress bar / nudge overlay above & below. -->
+<div id="jspsych-target"></div>
+
+<!-- Inactivity nudge overlay -->
+<div id="inactivity-nudge">
+  <div class="nudge-box">
+    <div class="nudge-title">Are you still there?</div>
+    <div class="nudge-body">
+      You haven't made a choice in a while.<br>
+      Please continue playing — click anywhere on the screen to resume.
+    </div>
+    <button class="nudge-btn" id="nudge-dismiss">I'm still here</button>
+    <div class="nudge-timer" id="nudge-countdown">Task will end in 45s</div>
+  </div>
+</div>
+
+<script>
+// ── Fail loudly if the CDN scripts didn't load (instead of a blank page) ──
+if (typeof initJsPsych === 'undefined' ||
+    typeof jsPsychHtmlKeyboardResponse === 'undefined' ||
+    typeof jsPsychSurveyText === 'undefined') {
+  document.body.innerHTML =
+    '<div style="max-width:560px;margin:120px auto;font-family:sans-serif;' +
+    'color:#e0e0e0;text-align:center;line-height:1.6">' +
+    '<h2 style="color:#E8845C">Could not load the task</h2>' +
+    '<p>The jsPsych library failed to load from the internet. Please check your ' +
+    'connection and refresh the page. If the problem persists, contact the researcher.</p>' +
+    '</div>';
+  throw new Error('jsPsych failed to load from CDN');
+}
+// ═══════════════════════════════════════════════════════════════
+//  Probabilistic Bandit Task v10
+//  3-arm probabilistic reversal-learning task (reversals throughout)
+//  Three profiles, one per arm:
+//    reward-arm:  75% reward (+10), 25% loss (-10)
+//    arm 1 profile: 70% reward (+10), 30% loss (-10)   (EV +4)
+//    arm 2 profile: 30% reward (+10), 70% loss (-10)   (EV -4)
+//    arm 3 profile: 50% reward (+10), 50% loss (-10)   (EV  0, pure chance)
+//  Outcomes are binary: reward (+10) or loss (-10). No neutral outcome.
+//  PER-PARTICIPANT RANDOM SCHEDULE: each session draws its OWN outcome sequence,
+//    reversal direction, and symbol placement from a random per-session seed
+//    (logged in every row for reproducibility). So the reward schedule and the
+//    left→right symbol positions differ between participants.
+//  FIXED REVERSAL TRIAL: the single reversal always occurs at the same trial
+//    (CFG.REVERSAL_TRIAL) for every participant.
+//  Three logos (heart, circle, triangle) are placed at three screen positions
+//    (1=left, 2=middle, 3=right). Placement is randomized per participant.
+//  POSITION-CENTRIC OUTPUT: each row logs the logo at each position
+//    (position1-3), the reward probability at each position (p_reward_pos1-3),
+//    the position chosen (choice) and the logo there (chosen_logo), the optimal
+//    position, points, regret, and per-position counterfactuals.
+//  The reversal cyclically rotates the three reward profiles in a random
+//    direction, so which position is best flips (the 50/50 profile moves too).
+// ═══════════════════════════════════════════════════════════════
+const CFG = {
+  N_ARMS:          3,
+  N_TRIALS:        200,
+  REWARD_PTS:      10,
+  LOSS_PTS:        -10,
+  // Arm probability profiles [p_reward, p_loss]
+  PROFILE_A:       [0.70, 0.30],  // best   (EV +4)
+  PROFILE_B:       [0.30, 0.70],  // worst  (EV -4)
+  PROFILE_C:       [0.50, 0.50],  // chance (EV  0)
+  // Single reversal at a FIXED trial (1-indexed data trial), same for everyone
+  REVERSAL_TRIAL:  112,
+  // Timing (ms)
+  FEEDBACK_MS:     900,    // bandit feedback (points + corner pics / sad emojis)
+  ITI_MS:          500,
+  ANIM_MS:         400,
+  CHOICE_DEADLINE_MS: 4000, // no choice by 4 s -> "Please answer faster." prompt; trial still waits for a click
+
+  // ── Mini-MID "bonus round" config ──────────────────────────
+  // 16 food-cue + 14 neutral-cue speeded-detection trials, interleaved through the
+  // bandit. The food cue is drawn from the participant's assigned win set (sweet OR
+  // savory); the neutral cue from the "neutral cues" folder. Target RT is the
+  // incentive-vigor measure. Bonus points are kept on a SEPARATE tally from the
+  // bandit score so they do not perturb the bandit's running reward rate.
+  N_BONUS_FOOD:    16,
+  N_BONUS_NEUTRAL: 14,
+  BONUS_INTRO_MS:  1000,   // "Bonus round!" screen
+  CUE_MS:          1500,   // cue image (food/neutral), centered, ~half screen
+  DELAY_MIN_MS:    1500,   // anticipatory fixation jitter, lower bound
+  DELAY_MAX_MS:    3500,   // anticipatory fixation jitter, upper bound
+  GRACE_MS:        500,    // post-window listening: a late press is logged as miss-with-RT, not no_response
+  BONUS_FEEDBACK_MS: 1500, // "Congrats! +10" / "respond faster" / "too soon"
+  BONUS_PTS:       10,
+  // Adaptive response-window staircase. Weighted up/down converging on ~66% hits:
+  // a hit shortens the window (step_down), a miss lengthens it (step_up). The ratio
+  // step_down/step_up = (1-0.66)/0.66 ~= 0.5 sets the target hit rate. The window is
+  // only the success criterion; target_rt_ms is recorded regardless and is unaffected.
+  // (To revert to a fixed sampled window instead of a staircase, set WIN_STEP_* to 0
+  //  and draw adaptive_window_ms from a fixed range in makeBonusTrial.)
+  WIN_START:       400,
+  WIN_FLOOR:       250,    // kept >= a legitimate simple RT so trials are not unwinnable
+  WIN_CEIL:        500,
+  WIN_STEP_DOWN:   15,     // shorten after a hit
+  WIN_STEP_UP:     30,     // lengthen after a miss / no-response
+  // Bonus placement across the bandit stream
+  BONUS_FIRST_AFTER: 8,    // earliest bandit trial a bonus may follow
+  BONUS_REV_BUFFER:  3,    // keep bonuses at least this many trials from the reversal
+  BONUS_MIN_GAP:     3,    // minimum bandit trials between two bonuses
+
+  // Photodiode sync square: ON for direct-recording (iEEG) sessions, OFF for behavioral-only.
+  PHOTODIODE:      false,
+};
+
+// ── Food / neutral image sets ────────────────────────────────
+// FILL THESE IN with your image filenames. Paths are built as <dir><filename> and
+// URL-encoded (so the space in "neutral cues" is handled). Each session is randomly
+// assigned the sweet OR savory win set (logged as food_set); that set is used for
+// BOTH the bandit win feedback and the food bonus cues. If an array is left empty the
+// code shows a labeled placeholder so the task still runs for testing.
+const IMG = {
+  win_sweet_dir:  'win/sweet/',
+  win_savory_dir: 'win/savory/',
+  neutral_dir:    'neutral cues/',     // folder literally named "neutral cues"
+  win_sweet:      [],   // e.g. ['cookie.jpg','cake.jpg','donut.jpg', ...]
+  win_savory:     [],   // e.g. ['fries.jpg','pizza.jpg','burger.jpg', ...]
+  neutral:        [],   // e.g. ['stapler.jpg','mug.jpg','chair.jpg', ...]
+};
+const SAD_EMOJI = '\u{1F622}';   // 😢
+
+const ARM_LABELS = ["A", "B", "C"];
+const ARM_HEX    = ["#274c86", "#9c4620", "#256b50"];  // dark blue / rust / green (for symbols on light box)
+const OUTCOMES   = { reward: 10, loss: -10 };
+
+// ── Google Drive saving (required) ───────────────────────────
+// Deploy the included Apps Script (save_to_drive.gs) as a Web App and paste
+// its URL here. Each participant's CSV is sent ONLY to your Drive folder — there
+// is no local download. If this is left as '', the data has nowhere to go, so
+// set it before collecting data.
+const DRIVE_ENDPOINT = 'https://script.google.com/macros/s/AKfycbwxm8VUHSeF_Fe4XwRODRxVROo6Bz-Tj6vXeiN5Rnuw6HshO_Wo6zVAomcMQWnVjNEQ5g/exec';
+// Shared secret sent with every save. It MUST exactly match SECRET in
+// save_to_drive.gs; the script rejects any POST without it, so a stranger who
+// finds the public endpoint URL cannot inject data. (Note: this value is
+// visible in the page source, so it deters drive-by abuse rather than being
+// truly secret. Change it to your own random string and keep both files in sync.)
+const DRIVE_SECRET = 'R4nAkqQm2xDI9gAewTatgQ==';
+
+// ── RNG (random per session → schedule & placement differ per participant) ──
+// A fresh random seed is drawn each session and LOGGED in every data row, so the
+// outcome sequence, reversal direction, and symbol placement vary between
+// participants but remain reproducible from the logged seed. (The reversal TRIAL
+// is fixed in CFG, independent of this seed.) mulberry32 is integer-based and
+// reproducible across browsers.
+const SEED = (Math.random() * 0x100000000) >>> 0;   // random uint32, logged per row
+function makeRNG(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+const _rng = makeRNG(SEED);
+function rand() { return _rng(); }
+
+function randInt(lo, hi) {
+  return Math.floor(rand() * (hi - lo + 1)) + lo;
+}
+
+// Sample outcome from a probability profile [p_reward, p_loss]
+function sampleOutcome(profile) {
+  return (rand() < profile[0]) ? 'reward' : 'loss';
+}
+
+// ── Reversal schedule ─────────────────────────────────────────
+// One reversal at a FIXED trial for every participant. CFG.REVERSAL_TRIAL is the
+// 1-indexed data trial at which the reversal takes effect; the internal schedule
+// is 0-indexed, so we subtract 1.
+function generateSwapSchedule() {
+  return [CFG.REVERSAL_TRIAL - 1];
+}
+
+// ── Task state ───────────────────────────────────────────────
+const SWAP_SCHEDULE = generateSwapSchedule();
+
+const S = {
+  pid:        "",
+  trial:      0,          // 0-indexed global trial
+  score:      0,
+  data:       [],
+  taskStart:  null,
+  // Current arm profiles [p_reward, p_loss]. All three rotate at the reversal.
+  profiles: [
+    [...CFG.PROFILE_A],   // arm 0 (best at start)
+    [...CFG.PROFILE_B],   // arm 1 (worst at start)
+    [...CFG.PROFILE_C],   // arm 2 (chance at start)
+  ],
+  // Track reversals
+  swapCount:  0,
+  // Randomly chosen Celtic symbols assigned to the 3 arm positions (set lazily)
+  symbols:    null,
+  symbolMap:  null,   // per-participant random map: logical arm → symbol index
+  slotOrder:  null,   // per-participant random map: screen slot → logical arm
+  // Session flags
+  started:        false,  // set true once the first choice screen loads
+  driveSaved:     false,  // ensures we POST to Drive only once
+  exportFilename: null,   // stable filename across re-downloads
+};
+
+// Apply the single reversal if it is scheduled at the start of this trial.
+// It cyclically rotates ALL THREE arm profiles in a random direction. A 3-cycle
+// is the only permutation of 3 items with no fixed point, so every arm changes
+// role — including the 50/50 (chance) arm — and which arm becomes best is
+// unpredictable.
+function applySwapsIfNeeded() {
+  if (SWAP_SCHEDULE.includes(S.trial)) {
+    const p = S.profiles;
+    S.profiles = (rand() < 0.5)
+      ? [p[2], p[0], p[1]]   // rotate right
+      : [p[1], p[2], p[0]];  // rotate left
+    S.swapCount++;
+  }
+}
+
+// Which arm (1-3) currently holds the 50/50 (chance, EV-0) profile.
+function chanceArm() {
+  let bestDist = Infinity, idx = 0;
+  S.profiles.forEach((p, i) => {
+    const d = Math.abs(p[0] - 0.5);
+    if (d < bestDist) { bestDist = d; idx = i; }
+  });
+  return idx + 1;
+}
+
+// ── Header ───────────────────────────────────────────────────
+function showHeader() {
+  document.getElementById('bandit-header').classList.add('visible');
+  document.getElementById('progress-wrap').classList.add('visible');
+}
+function updateHeader() {
+  const t     = S.trial + 1;
+  document.getElementById('hdr-trial').textContent  = `Trial ${t} / ${CFG.N_TRIALS}`;
+  document.getElementById('hdr-score').textContent  = `Score: ${S.score} pts`;
+  document.getElementById('progress-fill').style.width =
+    `${(S.trial / CFG.N_TRIALS * 100).toFixed(1)}%`;
+}
+
+// ── Register choice ──────────────────────────────────────────
+function registerChoice(arm, rt_ms, late = false) {
+  if (S.trial === 0) S.taskStart = performance.now();
+
+  // Apply swaps before sampling (swap happens at start of trial)
+  applySwapsIfNeeded();
+
+  const rt_s   = parseFloat((rt_ms / 1000).toFixed(4));
+
+  // Predetermined per-logo outcomes this trial (one draw per logo in a fixed
+  // order, so the per-session seed reproduces the sequence). The chosen logo's
+  // realized outcome IS its counterfactual; the others equal what they'd give.
+  const cf_outcomes = S.profiles.map(p => sampleOutcome(p));
+  const cf_points   = cf_outcomes.map(o => OUTCOMES[o]);
+  const outcome     = cf_outcomes[arm];
+  const points      = cf_points[arm];
+  S.score          += points;
+
+  // Screen POSITIONS (1 = left .. 3 = right). slotOrder[p-1] is the logo (logical
+  // index) shown at position p this session. Output is logged in POSITION terms.
+  const L            = p => S.slotOrder[p - 1];           // logical arm at position p
+  const sym          = a => SYMBOLS[S.symbolMap[a]].name; // logo assigned to logical arm a
+  const choicePos    = S.slotOrder.indexOf(arm) + 1;      // position the participant clicked
+  const p_rewards    = S.profiles.map(pr => pr[0]);
+  const optArm       = p_rewards.indexOf(Math.max(...p_rewards));   // best logo (0-idx)
+  const optimalPos   = S.slotOrder.indexOf(optArm) + 1;            // best position this trial
+  const is_optimal   = choicePos === optimalPos ? 1 : 0;
+  const optimal_points = cf_points[optArm];
+  const regret         = optimal_points - points;
+  const prob           = p => parseFloat(S.profiles[L(p)][0].toFixed(4));
+
+  S.data.push({
+    participant_id:    S.pid,
+    trial_type:        'bandit',                    // distinguishes core RL rows from interleaved bonus rows
+    trial:             S.trial + 1,
+    swap_count:        S.swapCount,                 // 0 before the reversal, 1 after
+    // Which logo sits at each screen position (left→right); constant within a session
+    position1:         sym(L(1)),
+    position2:         sym(L(2)),
+    position3:         sym(L(3)),
+    // Reward probability at each position this trial (reverses at the reversal trial)
+    p_reward_pos1:     prob(1),
+    p_reward_pos2:     prob(2),
+    p_reward_pos3:     prob(3),
+    // Response
+    choice:            choicePos,                   // position chosen (1 = left .. 3 = right)
+    chosen_logo:       sym(arm),                    // logo at the chosen position
+    rt_s,
+    choice_late:       late ? 1 : 0,               // 1 if responded after the 4 s "Please answer faster." prompt
+    outcome,                                        // reward / loss
+    points,                                         // +10 / -10
+    optimal_position:  optimalPos,                  // position with the highest reward prob now
+    is_optimal,                                     // 1 if choice == optimal_position
+    optimal_points,                                 // points the best position gave this trial
+    regret,                                         // optimal_points - points
+    cumulative_score:  S.score,
+    seed:              SEED,                         // per-session seed (reproduces schedule + placement)
+    // Counterfactual: what each position would have given this trial
+    cf_outcome_pos1:   cf_outcomes[L(1)],
+    cf_outcome_pos2:   cf_outcomes[L(2)],
+    cf_outcome_pos3:   cf_outcomes[L(3)],
+    cf_points_pos1:    cf_points[L(1)],
+    cf_points_pos2:    cf_points[L(2)],
+    cf_points_pos3:    cf_points[L(3)],
+  });
+
+  S.trial++;
+  // Update score + progress now so the feedback screen reflects this trial.
+  // The trial NUMBER advances when the next choice screen loads (see choice.on_load),
+  // which keeps the counter on the current trial and prevents it overshooting to 201.
+  document.getElementById('hdr-score').textContent  = `Score: ${S.score} pts`;
+  document.getElementById('progress-fill').style.width =
+    `${(S.trial / CFG.N_TRIALS * 100).toFixed(1)}%`;
+  return { points, outcome };
+}
+
+
+// ── CSV export ────────────────────────────────────────────────
+// Build a stable filename once, so re-downloads and the Drive copy match.
+function exportFilename() {
+  if (S.exportFilename) return S.exportFilename;
+  const etStr  = new Date().toLocaleString('en-US', {
+    timeZone: 'America/New_York',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+  });
+  const [datePart, timePart] = etStr.split(', ');
+  const [m, d, y] = datePart.split('/');
+  const ts      = `${y}${m}${d}_${timePart.replace(/:/g,'')}`;
+  const safePid = (S.pid || 'NA').trim().replace(/[^a-zA-Z0-9_-]/g, '_');
+  S.exportFilename = `prob_bandit_${safePid}_${ts}.csv`;
+  return S.exportFilename;
+}
+
+function buildCSV() {
+  if (!S.data.length) return null;
+  const taskDur = S.taskStart
+    ? parseFloat(((performance.now() - S.taskStart) / 1000).toFixed(2))
+    : null;
+  // Bandit rows and bonus rows carry different columns, so build the UNION of keys
+  // across all rows in first-seen order; missing cells are written blank.
+  const keys = [];
+  const seen = new Set();
+  S.data.forEach(r => Object.keys(r).forEach(k => {
+    if (!seen.has(k)) { seen.add(k); keys.push(k); }
+  }));
+  const allKeys = [...keys, 'task_duration_s'];
+  // CSV-escape: quote any value containing a comma, quote, or newline (e.g. a comma
+  // keypress in target_response_key, or a path with spaces).
+  const esc = (v) => {
+    if (v === undefined || v === null) return '';
+    const s = String(v);
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+  const lines = [allKeys.join(','),
+    ...S.data.map(r => [
+      ...keys.map(k => esc(r[k])),
+      taskDur !== null ? taskDur : '',
+    ].join(','))
+  ];
+  return { filename: exportFilename(), csv: lines.join('\n') };
+}
+
+// Fire-and-forget POST to the Apps Script Web App. no-cors avoids a CORS
+// preflight; we can't read the response. Data is saved to Drive only.
+function saveToDrive(filename, csv) {
+  if (!DRIVE_ENDPOINT) return;
+  try {
+    fetch(DRIVE_ENDPOINT, {
+      method:  'POST',
+      mode:    'no-cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body:    JSON.stringify({ filename, csv, participant_id: S.pid, secret: DRIVE_SECRET })
+    }).catch(() => {});
+  } catch (e) { /* ignore */ }
+}
+
+function exportCSV() {
+  const out = buildCSV();
+  if (!out) return;
+  _completed = true;     // a full/quit save is running → suppress partial beacons
+  // Drive-only: send to the Apps Script endpoint. The participant never gets a
+  // local CSV download. (DRIVE_ENDPOINT must be set for data to be saved.)
+  if (!S.driveSaved) { saveToDrive(out.filename, out.csv); S.driveSaved = true; }
+}
+
+// ── Partial save if the participant leaves mid-task ───────────
+// Best-effort: when the page is hidden/unloaded before completion, fire a
+// navigator.sendBeacon() POST of whatever has been collected so far to the same
+// Drive endpoint, with a "_partial" filename so it's distinguishable. De-duped
+// by row count so repeated tab-switches don't spam identical files, and never
+// runs once a full/quit/timeout save has happened.
+// Limitations: sendBeacon is best-effort and not guaranteed (some mobile
+// browsers, hard crashes, power loss); and because the POST is no-cors the page
+// can't confirm receipt. It is a safety net, not a guarantee.
+let _completed  = false;
+let _beaconRows = 0;
+function saveBeacon() {
+  if (_completed || !S.data.length || S.data.length <= _beaconRows) return;
+  if (!DRIVE_ENDPOINT || !(navigator && navigator.sendBeacon)) return;
+  const out      = buildCSV();
+  if (!out) return;
+  const partname = out.filename.replace(/\.csv$/, '_partial.csv');
+  try {
+    const blob = new Blob(
+      [JSON.stringify({ filename: partname, csv: out.csv, participant_id: S.pid, secret: DRIVE_SECRET })],
+      { type: 'text/plain;charset=utf-8' });
+    if (navigator.sendBeacon(DRIVE_ENDPOINT, blob)) _beaconRows = S.data.length;
+  } catch (e) { /* best-effort only */ }
+}
+window.addEventListener('pagehide', saveBeacon);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') saveBeacon();
+});
+
+// ── Symbols ──────────────────────────────────────────────────
+// Three fixed symbols (black PNGs embedded as data URIs). Each is assigned to a
+// logical arm at random per session (S.symbolMap), so which symbol is the best /
+// worst / chance arm varies across participants — independent of screen position
+// (S.slotOrder), which is also randomized. Both are reproducible from the seed.
+const SYMBOLS = [
+  { name: "heart",    uri: "data:image/png;base64,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" },
+  { name: "circle",   uri: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAANwAAADcCAYAAAAbWs+BAAA240lEQVR4nO2debhkVXX2f3WHbhoZeoCGRgURAg2izeCAKKCCGOKAxiGECJjP4BjHJBiNE6J+CQpKjBoTNKIGQYwySVAEDCpiUBEDiAyCMs/N2HTfKX+8583e99Q+Nd26Vafqnvd56rm3Tk3n7LPXXmu9a9i1NYedRIUKFXqDkX6fQIUKCwmVwFWo0ENUAlehQg9RCVyFCj1EJXAVKvQQlcBVqNBDVAJXoUIPUQlchQo9xFi/T6BCErUW/jdmcn/z/1coESqB6w/yguPn3RSeWuJ7Y1RC2QdUAje/yE/6lEClno8Dm0SPxcAyYFH2Wi37zCTwKPBA9ngYWAesz15rRahqyLWYYfY5VpgHVALXXXjyjgBTwDSzJ/AIsDHwOGA58BRgDbADsCI7thwJ1hgwmj1GsucjBCG2cEwj4ZqIfnMqe2098HPg18AdwHXATcBaJKjrs/dNRec4Hn3v9FwHpMJsVAI3d1jIRgmT3hN4M2B7YCWwHbAfsD+wbQ/P7w8Sxx4Cfgn8GLgKuDl73I40pDGGrs+CXGGOqASuc1jQpqJHDXgu8DQkVHsAL6DxOPfChLNZO43OeVNg3+xh/B74GXApcCtwERLA+DtizVqhA1QC1zpSxMYUsBESqpch03APZB7GmCAIaOzXQZp5nC/EYSCbu76ebbPHH2fPrwBuBC4DzgKupF7QRqgEsC3Uqnq4phjN/sZ+zmZIi70T2BPYEpEbxkT2t5Z9vpdC1Smmo4f9ReNu4E7gO8A3kPBtiF4fo94XrJBApeGK4bGZzP6uBJ6ONMArEGsYC5KJihFEPLSDmYJHJ6hFf0ei/5sJvcken4+vZxQtKFsCuwFHI+13OjI7rwHuzz63iNk+bIUcKoGrhyedBW0/4FnAnyJzMYYFw5qsFeSFqhda0CEECMLXSAjz1+NztUm8e/YA+C8kfJcAl2fHxggCWyFCJXBC7J+ZjTsc+EPgpYhkgECMtKI54smW99nyn3kIxdFuQH7TQ8iMexCZbvnwQur8x5E/uSnyIbcCdsz+fzzN73XR+abOOR6n/bPH7cC5wJeQ8OW/qxI+KoGz4HjybA4cAhwF7E0Ynw2EuFgjeFU3nZ7H/cD1iJL/LXAtmqj3Zr/xABKybphkG6HrWYLM3xXAFsgsfDoiSLbJ3kPufO3LFWneWAPahFwFvB54OXAxcAwyPS1oozRfOIYeC1XgrBHs+K9EgvYOFIw2JtAYLWryfWYh4/G8C7gPmVk/An6KhOwRZhMOReeXYjSbIQ5YP5Y9QMHuGKPomrYAdkFm835ICJcjLenFaAMhzpg6FwfnHXBfgXzcFwMXAp9E8T6fyxjBvF1wWIgsZUxlrwJeDbyB2YI2TfPJ7gkWC9o1wG+QgJ2FNFgjpEy11P/toijs0IyMWQI8GzgI2At4JmJkobnWi38j/7vfBr4KnJl9xzitp54NFRaSwHlyW5iORsK2V/Z6MyFr5ON8FplP30c+WP43/fmyTbBa7m8+m+QAZH4+A3hl7rVG4xG/x0IKErwvAN+NPle2MZlXLASBiwUNRIR8lCBo9s+KagPtd4zmjp0CnIr8r0uj18ai9wxaOlQqFxTkD65BaWJvQ5ovxhTBBE4h9m0fROTKu1B+JyygAPqwC1zsLzweeB9y7BcTiIkiIsRJwfbfHgHuAY4D/iP7399hs3KYcg7jcMVEdHxj5OsdDhyJ4nMeI/u8RYI3QYhR3gZ8BDgZ+Xd5AmsoMcwCN45u8ObAnwH/QMgGmaIx4zhJ0FTXoxzDf0GB3hhe1YedfYtLeGKB2Bx4IfKB96O1hSyO6YGyVz6NzHEYclJlGAUu9gv2RubjAdlzJ+8WIZ4MtyJH/4tI6Pzd8XsXKlKxtUNQFs4R2fN2xnoC+BzwCTTuIwypphumnibxKgzwecSKHYD8tHhVjRH7DrXsve9BK/d7kbCNM9vPWMjCBvVZMiNorI8EngecRzpROkZcbTGOQjLnI3LGwjZM8xMYnguKzZ3VKN3oTSi+Zj8s71fMEOJnNRQz+xIKDB+HijYtaBMM6Yo7R8Q5l/bd/gtpuqciU3w9YZ6lAvqjhNSzXRAZ9TnkKzqRehCSv1vCMAiczY/FwJ+jYOt+BAIjFdz3ijuOBO1rKF/y9Si9yqtvJWitIc7VHEVFrFeicMLBSAitDVNBf5NO02hxfDPy6XZndg7owGPQBc7Ctinwj0hDrSLQ+Knrs28xguJCf4wYt+uZXWRZCVr7sMbzOI4goul5wNuRxnNFQcosjzXhs4HvIeFz+c/AC92gCpxXy2lgZ+AMxJRNUHxjrNVGgKtR+tEr0eprs6Xyz7oDj6MXtxrwGVSk+2FmZ6ukxtv3dktkXn4EWTBFfvjAYBBPPl4FXwP8EFVcO2Uo5as5MDsFfAWtuGcQfI8FmWbUI9hSGEeJ2seg1DGnvdVI+3a2XqYQiXUJMvt9nwcSgyZwvgkjiH4+Da2CFqg8nK41ihKHD0FM2t2EVXZoYz4lggkqm/LnI3LrU6hCwg2Y8oiLYvdE7OdLmR1AHygMksBZ2JYj8+Tk7HicqxdjKvrMScgnODd7zatqpdV6C6e72Xx/NzLrf0loz5dHnJq3FLV4+BOCAA+UXzcoAmebfinwz8iRthlYdA2jwO9QeOAoVC5jwawErb+Ia+QuAF4CnEhxEjWE0M9ixCq/g+CXD4zQDYLAjSJttAxlfrwarW6pMpGYXfweCnr/K4GxrHptlAtTyIe+FTVkOgSZ+7ZMUsFystc/hcgUGCAypewnaWHbCZEjL6GYHJlCWm8E+CfEQt5AuHkVzV9O+J7VUA3hPog5biR0NjE/gPIwHcMr+3wu9QlaI61GJftPoTE5MooE8a9RCcmjFN+0CuVCnMp1PaoW/wrFbRlMhM0g0/ILqITI/mFpUVaB80DvgIiOrSjO8Lc5cTdwGHA8s7P4KwwG4rjdo8AbgWNp7Hf7Hv8/4N8QYw3lndelPDFrtp2RH7YtyscrYiJrqKXBgcDXkZartNrgwlrqMeCDKN0OihfQEZQudijKgTUDWkpNVzaBswm4NTITnowGL9XEZwMSwrNRetavsvel4jkVBgsWuhGUrncQcEv2PBU3de3j64ATCAJXOqErk8DFeZGnoF6HZrHyA+cKgG+hBq0OZDfrhlVhcBDXy30f3ed7CZX1MdyFbRr5dB+nOD7bV5RF4Hwey5At/nyKB8wVAN9B1QGPUFH+wwr7dWPIbTgMkSpx3WMML9rvBT6EFuZSCV0ZBM7aawzFVl6JBiplDphCPhm1TXiQihxZCPB9/x5KgH6I4vvuHiwfRiZms3YaPUUZBM6M5JtRnmNRUNvdtU5BmSMPULzSVRg+2OL5NUo+v5l0KwaHDNahPjSO3Zai6XG/BW4UrV6vQQFMF4WmgtqLUBn/WwhCWWm2hQVrq8uRpruNtDsxglLAxlE8bxeCluwr+nkCziLZG2mtIuFxMekZSANas1U+28KEhe6XKIn5AdLmpbXfMlRTt4gShAv6JXA2BbcnZBRA/WCYHv4VIkiKBrfCwoKF7kdoEXY8Nu9eeJ7tTwgX9BX9ELi4vfbHUDfflLp31sHvUQuEtYR0ngoVHDI6ExEkRXE3l2K9NXsUxXV7gn4InFX9MSi2YjIkRpyu9Tqk4WyCVqhgeKH+OKoccAJ7KvdyGgnm3oSkiZ6j1wLn1WYf4O8IZEgMBzwnURLyRaSDnRUqGCNI4L5GqBzIvz6Ntuf6FCpi7ktJTy9/0Op+KdptZl2D97re6TSK03kqVIDZwnU0ChuY/Y7hRXtvQiZKz9FLgXOrs39C/QZTO4qaJPkxSlytCJIKrcBz5C7gtWijlZS/b7fkKJR/2/Nynl4JnJvEHIS2pE0FIl3rdh3K/H6MEiafVigtzFz+AqV2NaouGEGbu2xMj5OceyFwjpltjsonllAfD7HfthYVkN5CFdiu0D68aJ9ECDelfP9pYEdkRfW0Uny+f8hCtRg1/1lDfVKyhW0MJS6fRdrxrVChHbwbBcfzSRJxA9q3oM0le5Zv2QvJnkY9BQ8lxE5imC26BjFNRWX1FSq0Ai/o9wJ/S3BN4gU8LgX7JGIte6LpemVSfpXG20WtQ/G2tVQNfyrMHQ43fRex3akkZ/MK+6K515MFfj4FzizRO1HlNqRTt0ZR2s1PWYCbrFeYN3grso+ish6z5DF87Hi0Tdm851rOl8BZcJYCf0maMXL+22WIMaoYyQrdhIVrHVr0nYcbC13sz72NHiz28yVw9sPeiTazz1feeiVxuo0LCivtVqGb8Dy7BjGXKTgscCgKis9rBsp8fLGj/LuiLaQWJX7H9O030AYNKXVfoUK34ISLtaS3JJsGNgP+Kns+UAJniv+1aHPEDbnfcdD7IVSnNEN6ECpU6AassW4C/p50qqCtrQNQcsYk81Qh3m2B84mvQi0TivbymkGByR9RJSZX6A1sUf2asCeg4aT6ZWjeeiefrvMK3RY4a6l3IMIE6jNKRlBj1w9TJSZX6A0cY7sRJS67rCe2qrzwvwB4DsVt9eeEbn6hnc+dCYV+Rd//TpRgWpmSFXqFSaS5vgH8d3YsZs6tGDZDGSiLCUx619BNgfOK8S60sUIezh65HPh3qjBAhd5jCnEKbyN0do7hOfxHKHZcWpMybtjyR9mxvOayxjsReLjgPRUqzCdcjnM5cCHpuNwM8DiUFtb1+dlNgZtBu5hsRX1empNDfw6ckx2rNFyFfqGGkpsfTrzmeXsYqijoKnnSDYFzNvYmaMNztyOL4ZbVpxH6w1f5kvWwmTOCFqj8w69Vi1XnMG9wFWpAZIYy/55R5B5BF12vbnyR1fCzgb2oXxEcd7sWJTGnEkkXImpoXBZlDwf/nbw9lXj4tZncZ1OdqisUw0riFELOZQzP4RciRdI18qQbwT0L1CHo5CZIx94uAe6gPgaykGANVkNjkOq7sRmqRN4MMWUz0fvWof0U7kl81gJsoa3848ZwK48folBAHOy2cD0eBcK/RbpPStuYq8BZW21NIEvyOZMjaIebE7JjC0m7xcmx/mvzZSPgRcAzgJXIUV+OKuM3zv4uyn3mUZSEe0/2WI9M9PNRd7PUhMifQ4WgJB5AiuAF1JMnU+g+vAwJXFfm7VwFzid5IOqinCrimwGuRDbzQmkKZC2WrzTeHsUo90PWwLbops4VbwJuRSTAD5Dpfg2zNZ3LpRbC+LcCm41noK7e21A/f2fQZiB7IcJvzr1RuyFwo6iAD+rtXD//aOK1YYRJDWuaTdE+5QeiMqWtqI9R2jeD2Q1tUuMVa0r/P4LCMcuy53sjZ/8G4ItoH73fEnaGHc/95kKFuw/8HPgfZD7GY+INPlegVuk/78aP1tYcVlS10Pyz6KY/Dbgi8bpXkBtR5cBj0WeGEbFvui0SssNQQmweKQGbC/ICGGMDYocvRpUZtyTOd6HCGuvVKBkjzz3Yr/se2rfwYeY4h+fCUvqzry04Ad/MExhuYbPATAJbok5QZyPtcgBBm8TX3m16Pw4nGDYfF6G9Gf4VNWg6DngSYdPLhWB5FMHs4+lIMcDs+2QzfD+0iMIcx2suAucTO4h638ymJoS8tX7t1DNf8PU5M+HTSIscg7T+JCHg30y44jCAPzeTe0xRHy5oxEZaCM1yTgJ7AH8DXIAyKeJFcNjuTzuoIWIkdXyGQHDBHE3xTgfZN3If0pLvTOvzgd9kx4bJZ7ApshixWNegConVBGFIdZY2ppEAbCCMlYPb/lwt9xilPiBuQZ4gvYkFhHCBs+EnUJ7g/0f35mAC25wK5ywEzCALIJVV4rn+fnS/54ROSRMTA0ciZ72or995iHodFn/BWmMKtWt/P7LtIWiiRv0NraHGmb3Y3QvcDtyPqP+1qG23919YjDaisNm6efRYyeyJ4N1hU4upBdVs3I7AuWiyHYOYzoXapvBWFJPbj3rBq6F5vjm6Lx2jE4GzsK1CdUN5OMZxFzKxYDhuns2LKeDPUMn+UkK/liJ/KGYW7WfdgVivqxGJ8QuUidPOzdwqe2yPmpnuhuJJm2Svx33zU6u2z2ka9dp/Bkos/3LueocdFq71wNeRwLmUJ48DUXZKx2PTicB5BXwpYh/z5ehePa9FdOswxN48wEuQr/bn6IY0KsX3OMST/ifAZ9B+dzehhIAYNhmNlIljob8ze/wK5QQuAZ6C6hGPRGlJ8WdS9Yk2VSeRxv43QlhhHQtnTz7f3/9GmTybMHvs/f9bkMDluzm3jE58OP+Q64XywuST/A1aNQa9QZDPfzXKSngDYdFJCZvNRo/t/ah3yx8gx/vrKAngkezz4wQTcAaZhH5M5p77GAThtH+2DvgZordfjhbDCwjt4WyZpBY/+3dTwBuB72fna/N32OH5eRNSEkX5vtuh2GrHuZXtCpwFbCnw9OxYfkV2wPD70bFBhX3P/VEAeXc06fONkQyX7o8ic/FYRCq9FbgeNU6KyQ4LVDPGMQ+bgmY1TfHbR3sU9e44ENgJ7etwQ3Y9RW0tfF7TiAy7AGVYTDBPDXVKhhHgPtLV4KAxX4FIMuhwL4JOBA4UlX869WaKJ8zdqMAPBtck8cTcF5EKTyas+KmKdjOTtyFB2xfF5Bws9aNd4WoVNjW9+vpe3YUa4xyAmEmXRxXlXVronojiic8mvQf7MCEmuy4jEE++R75vSwimekfj0ekgrkKMTV61+v+16EbnG7UMCjzpngl8E5lX+V1/DAvPKOqX8YdI0O4jaIY4ntYLxL9VQ4vE74D3IbP2jNy55eH7tgoFy19BsQk9LLBG+yViLIvMyqXZ347MynYFzjdnV9I3yidwcScnUxK4OPa5wH8g2j3Vwcn+1gjyk/4COAL5AI1Mt14jPs9xxI4ehszcDYTV2+9bR+iEPYXCEacgU2re+jWWAGZ1r0O5p1BfQQDS/J4TPRG4UWTj2/xIved0BrMjl4VkJ9Qa+wnUt2mPMY7IoZegVK71BNavbMzsNMFUWoeInH1QHqzZyDFkLju04OMboXDBi2g8HoMMF/VOIqIrDzOZOyNfHjqwEDsxKRejmI9PInViv+rge/sND+gy4GtoYFMremwenot8ox8z20crM7wyu8fMwczeBDMfirAvswylP+3MPPVsLBF+nf2Nr9GL8eNQwgDMs4bzl7vkJP+D1mb3EjIkBkXDxYHM01AQOOWzxH7RiUiz2d4fJI1ugmUUZbgciuKLcXgihsdnY+BUNOGKfNpBhq2Sc5CbkB8L/79F7nnL6GSVWkmapfOPX4iqAwYJHocPIRaqiJWznf+PaOP2mEofRFhTrUMbWXwwO57PpPD/DpB/Eq30qWD6IMP38WpE/OVhBbNN9neSNrVcJ4Pljevy8LHzmZ1WVHbYT3klYvGK8kIfy45/FiUqr2c4Cjl9r6ZROOPthCC7r+1+QqB+A+pfczyDf+15eAF5iOAa5MuqQHvVb9nJD3QicM4wycMndn32dxAEzte/Cu114KyK/LmbODgPVW77PYNiQjaD/bYaSj37JKqjM3u5nECkeKOLI1Gl/yAtrq3A13Jvg9e2RU2e4mMtoRMfbs/sb9Fke6idE+gznBN3ONLcKe1mX+W7wKsIWSLDImyGhW4UBchPJghXDM+DjYDPIxIllfM5qPD1OlMqT5xMI5NyeXZs3k3KXRLHHC54NHsMAmxK7ow2F0mt1E5Avgqt5o8wnMJmuO/lQyg75XR0/Rty77MJuhHwBcIiNQxC53v7i4LXbWouy72/JbQjcJ58mxa8VgMuRaxd2yfSB9hcOhyZlKmOTTWUPf4+VFLjBjzDDPsx69CmFzci8zLvr3m13x/4a0Ica1jwaxond6zs5EtbFTj/yFKKM+RB8bcHOjmRHsPX8wS0H0KqcNQ+zadRnGqE0Plq2OGQyJ3AawiMXYokcYXBjoTA+iDDQnZ7k/e500FbxFG7ArclWu2KcE/2N078LDMORdoN0nVnDwD/wnCbkUVwaORnaOOL9dTHGq3ltgf+gRAqGAbTcgO65jwsM0+iB6ldS0lrON8E70ZS9gG32fQm0oLkbIz3MDgm8nxgBi2wX0YJz6mF1IW4fww8i+EJFUwRKvBT934VHZjQ7Wq4LUgXJPr1R3LPywizjK8grFLx+dofvZpAGixUzBCaE70DtYNIaXsX6Z5OCB8MOiZQhUUenisr6MB8bncybUO6c1Fe4MoMp+u8kXSpvLMvPo1KbAa1xKhbMJl0N6owaLSYLkeabhjMyilUAQ7p+z+vAhdruJHcMRMOppOLTrAMcALqNsjvSGm3cRS8Pz87VtZr6SUsQN8Bvk1xkvYMMtOHoS3DDMGdSGE59bvtNEW7AuccynyeXQ3RyKkdJcsED9ChKAE7n/Vu/+M/0ermXh8LHb7HU2ifiAepNy29eD0DmeuDHCbwfHdb+FRd3DI66FPZaYuFFNYTWJ2yagUL1I7UN0DyBFmHym3ijlsVAtF0BcqmTxXYuqbuCIIpPshj2CjENUoHmrxdgWv0/qKC1LLATXs2RQWmPmZ4kbgJaTg36akg2HWYQgKX8tet9Z6NilsHvYTH11ikQOZd4BrBHajKCl/ralRikgp2gyq4H2RwYom9hKu9TwV+SggJGCahlqMmSjMMZpjAC3E+pS2PnlR8FyHumVhGeBC3QwxTfm9nj8WPo/dXAjcbNhFnUEuJR6hncT2mhyA/J58yN0hopkD6KnBlt9U9KZZQLEiTDOfmI92EtdwpKL80L3A2O5+Bup4NMpotuH0VuI1IV4KXBR68ldSHA4wNNI69VBA8Np/L/qbm0QgqZ3LIaBDRTD7mvcVCikTwxF1MELgyajvfdJfHpwiTKRrHXioIHq8vk54T9o0PR/mVUM450QzNCJ+2SbV2BS4VhwNN5sWUN63HN3uUxoWDjxFiiZWGK4bHZi3y5SCtxRajJrqDBl+fS9GKFotmpEodOo3D1XLHXCm9IvF6mTCKfLgibKDcTGuZ4EqBU7PnqV78M4g8Ket8aIZmCqRtkrBVgbPE35f9TZWygNqolRkjNM4OWOh5k53gBtSp2H0tY9RQl+dBDYA3ms8dsfLtarhbox9JTcxFDV4rA4rIEqPMpE/ZEBdq/ij7P2VWborM+EFqNhQTbEWvraUDa6hVgfNA3kzjnpOb595fNmwgVC8XLQqDMin6DScOTKD9FHzMcLxuOSJPYLCyTmpoHwH/n8d9BIFrWcG0q+HuJO0o+nu2JZgWZZq4MQt5d4P3NTM5K8yG7/FvCG3h48nn3MrnZc8HKQA+Rrqleexeta1Y2vXhHqZxaGA1QcuVDT7HB7O/RQ1iyu6Hlgkew1tRe42i7JxBrBoYI/QtSeFBehAWuJ+03Wqy4Vmk41xlgK/1tsRrcSxxl9yxCsWwcF2TPeJjEMbQsbi2W4P3EaOoyRSkNdx1zKMPZ5bpEdJq1KGBojZ6ZUBew6WuYxztfRe/v0IxXA3wKKGBVGpcV6KFuGyuRiM0SgGEUCvXFtrtvOxOVo1gZqdsTGXMLkG9v+F6rzltKbsAYSIkVa4Td7hakztWVsTtzFPn6jlzR/a3revp5OJvKDjuE31K9resAncDMgfyOX7+/0nR80FZjfsJj+vvs795JnIGmZQdtQbvI3YuOJ6PSbeFdgTOP/TzJt/1Khr3ruwXrMF+C1xCfa2WJ8I2aNEY5LKSXsLz4teErY3zlgOUc06k4HmwJvGaQyGTiLFvG51MqKuyv/mVys93p5w5lXGPjZupP3+nKj0edZ6CwYob9QsWqHsIG3GmXh80gXtG9jfldtxJenedpuhE4K5r8voM6jff6ffPJ0zjnosGbZx6s3IGtQd4HIPFqvULscDlkyLivjHLGCyYbU9p65sIXEZbrlMnAnE7xVnSZjMP6uB7ewGzaj9BpiXMHjATKS8A9qYyK9vBQ6RzC+PC37LDbPsigkbOt1EEtVHsmQ/3CKEquki69+nkZHqAOIn2TOr3g5tEg7oIeANBA1Zarjni3WBT82IQFq7YLUppZFdA3ERYvOddw60HroxOIIUtUHigjJPVq/AXqa99myBoudcgx3lQM917DU/GRq+XHV58D0b7aOTP2a0T74yet4VO6uGmgMuy50W5ZFtQ7vy5GvI5vpc7Hps9M8CJVM2EWsViGm/MOEhj+NTsrzd1gaDRHmIOfW86LUC9PPc8ft0m2UsK3lMW1NDWuqkdW33O+wB/S3FLvbKgFj36hSWkcyZ9Tqmtn8oEN7bdmJC8kU/pqqHKiJ9lx+Zd4IzbES2asmH9fDXaeLysTN8Myv/7b0KT2PzrU2jr3a2ob4teFowSYl9eGHo53v6tcRqPT9mb6tqS2Z6QtJzKobwbpQd2lJDd7gTyj96CJirUD6RPfFekIWqUTzs4nrIO+ASisyeYvXh4bJ4InIQmVK8nczO48eoUWty8JXI//M5NSHci9jiWfWclWwi7oXueH0P/7/hbR90BOhG4ETR4v8qOpfZ+nkRxrL1p7kz3C9YGFwLnIZMon/3tCf1CpOncPLYMQudA/b7AvwHfBL4FfBwxbL0SOs+hnQkJD/5dz5dpQnJzWeEY7B6EORyP3yhamC+I3t82OlGLzkF07lzqpvrYwcBnkRr2wJcFXgQeAz6MMgu2ZnbszfsljKOJvBb4Cv3vfTKGJsQzgW+g8zZeAuwHvBgFZ+eb9PG9fhoh7cnzygJ3D8rugXLNAcNzc0sUg4X6+NsI2hH17OxYRyZyJz6JB+wnyLTMZ2tAmBBl777rIOcVaCBTTUut0R6HNMmLCZvO90PTeWx3Rh2ztkaExGT0eA69Tz6wdksJ992EBbqM1o7v45OBp1O8CcldiKXseN+JTgVuFDGVV0TH8vBE/VPK3X3XZuKbgR9QX7YDgX2dAU5DJqZbfvdS6CxsuwFfQg7+FKLkx7KHx3qPHp2TqfNUw9e4JOoOyhti8dzchRD6iq/DGvDLzPEaOhG4mCJ3l+LUpPN7DkUrR9H7+o148P4MJWfHOYDGCBLOjZGv9FrC/tfzzV7atJ1EVfVnIkKqKFzRq4ntybkMJX0XYR31m6eUBR6rcaQcID2mI8BZ1FeZtIVOJ4rt12/SeGsnT4gPd/g7vYKF5jbg7YRdYfIDu1H23k2Qhjme2SZ1t9nYEYK/OA0chYTtyTTO4qkBZ3T5XFLw9e6OgsX5xcdzYkP0/jJqOFDszf5b/hpmkEV3+1x/ZC4CN4r2wfZJNBrIP0IrYFkYvhS8v/eFwF9lx0yxxxiJ3vtuVAd2ILPbTMzFv3MYZVH2O9NIwP4F+GeKY4IzBC1yNMoG6pWm2wVp/snceVkgr6z7RLlQQ6l8KXfCC9tn6UJMuRum0EUUU9A2zZYCHyKQDWXFBJokXwDeQ9hwMCV0Xvl2QAvPPyNzb5oQRHfszjl4Kdhc9Ba2DkVsQD7aXyIz9yiCsKeqqieyz/8r8OkGv9dN2NLZjnQCRA1ZQN/Kvb9M8KL0Nw3eM0GIO/dN4Dx4n6Gx5vKN2BfRrvlVsGzwinYc8PdoEhctJr5ZM6i64FLgHxGT6SapzqK3ueVHnCHi7Y39/ueiCXA+Gt/FhHFMaTan030NeBdhJZ5P7eZz3xQRNF448niAoG3LRpyZYDoIJQ7kYUvuXEJrkTldQze0zW+Aawm7pKQqqaey1/8C5S96xS+jPR9P7PeiuqcPIr8tX84D4XrNbL0NCd9PEIv7fWR23kq6a/UISiXaHhEh+yJq2hujxHGt1LnaBP080spF/ud8YUcUhkiNDUhT2wQu2/32vXsrYlnz1+DnF6GcW7PEHWOuAudV61PohjeakKPAEcBXUfyujDcghpmrTyA/9XNoNXcJT35hMSEwgTTS87LHUcisWo+E91bC1l7Lsv+XoBsetxjcQKD6U/BYz6DxP5og9L0QNlsC+6LzT6X4gcxzKN+99k6tuxL2fM8Hu8fR/fpR/sOdolsCdx7KMVtO2p+zebUaUa/Hz/F3e4EZQqzta6i1xOeR+WQyI7W4jBPMvBoiE9zNeTsax8ecMD1CcQ8Q+4iL0ML1buD06Pd7ObHH0CJaFBqZAL7ew/NpBx6rlyMLI6XdxlEK4y8JpNicMFdfysJ1E8rCqFHcjdYT8QPAKtKCWTZYAGrAT4EDkIa2D/YoxUH/fBZ/6jGde15Dk7jovsTC+N3sfE5ndu5iL2D/dTWwV/Tc8JhcROjfWCYNV0OL1ibAixq8ZwL4IUH45nwN3RA4f8elBI3Q6MQ2RUJXphvQDL7O+9GKfgjyzTYmXH8sODFqDR4jueep342/bxRN4PeidoTX0h/T3Nrho4lzhKAJTqWc5Vk+H/vL+TCL2fSbkSvRSJG0hW6whTadzgV+TLCNU/CN+nOUYNuLLI1uwQmsoyjj4JXA6xBpZO3kxyTpGF4zWOv587Eg3oqKYfdB7OnD9Cch3PdrG8Sm5oXJyQ6PEAo1yyRwnoNjKLNoY9KlODPIlHyALgbsuzHZTS6sQ0HjZn1MTGEfTzCfynRDGsG+2xgiQk5GGRb7Iz/299Hr9gc2ELYydnLxVPT/RPQeL0D+/H3At1Ea2e7APwA3EszVftDsptI/gnZKyucdOuzzbcTOlpGNrqHqBu/Omucy7K/9dfR/V9CtILTNhlOANyEfrajFnCfK0xCD93kaa8WywWSKJ5nt/INRL5dDEU2+MyJI2m2AeiNwNWrF9nXkO8ZwmKUfcD7pChTkL6quWIf6xTikMScqfR4wjayF1GLg6/kOuhddRW3NYSd167ssNF9BO142IkXMCN2F8teuYrCELg/7Y/H5b4XM5lUo02YlmqhLCDG9dah05WZkutyJemZcFX1PrwmRRvA9ejfwSeqZ2g1ogbkMeD4ilcoU8I6Ldn9A8WYdNWBPlD/ZVQ3dzTQra7RjCSU5RfCNWwmcgFqLr6Oc5kcriNlMm3t3Euh6YxyN+WI0XhOk24PbrHSfzDLAk3UlWlBTvpvn07nIhyubdvM1fCD6PxY6K4JTCYteV+djNwkLO/zXEZidRpPFQncQcCTD0eXY5uYGgtBYyMx0rUP1YQ8ShM3vc+7lTPYdZRE2CGyk/Ukz0jG80JxCuTQbBOE/FIVT8haYBWs96mGzgXnoxdPtCe4LOAGZSinKOPX7n0T+Tt4BH2SYbTRZAsXhAb/PuZRl0/I+zx1RRgsUFxV/B4UryiRwDp2sQGlcJkLiuWbt9h3gYuaJlOq2wJll+x3Scu5xUQSbkEtQlrs3UBh0TZdCowD4IMApfFsRtEN87p7Ex0XvLwPiXNfXoVBGPj/VoYy1qKo7te1WVzAfE9sXeDoiA8ZoPPi+UXsRQgWDFJ8bdjjD4ijUoCgO+9jkMll0DIpLls1KmUba7U2kU/J8TdcB5zCPvud8TGqr5qtQ3Ci1GuYximzmQ1HswytOhf7CObBPQKZkauH0/b4F+T5ljau+FZnEUD/vzTC/j8BFzAvmS4tYyE5D3Y1bYR8XoYv+OHLMXQxaoT9wqGMJMiV3pD4FypNzPVoob6dc7RBtFj4LtflIzUHP1XNQut68+p7zJXBmHO9BBEqricpm6D6D4iBlbS++EOAg9zEob9MV5TGcZeQmtP0MyudhomcMkXJe9FM9Vx4F3tmLk5rPyWwW6MvAL2gvxrYU+HfCXtuVpustLDivRhPR2fIxvKjei4TSyb1lIIHiRIT3IQ2XYsCdMfQJxDfMeyJ4L7THFPAOQhuBZjBNvhr5BKlapQrzB5Nce6PiUccG8/DEPAGRDWXqPepzeTHqpeP+ofmcz3GUceKsmXlfLOZb4GxK/hitImO0JnRmifZGcZHtqMzLXsDjvitqob6MxkTJ95DP3dUE3znCPtgKRNpZa+XLb2qIqDseVV70pIVfLyawWasTUfZ4qzmTFs7dUIyurDuqDgtGkLA9CZFdTyTd8MnCdg3qUVNGOGbYyCUZRcXE59A8Xtw19MqkHEEM1gfQqtKqP2fT4IUorudK8UrTdRdmFrdHFsVu6L7lc2294N2OCnF74ve0AZ/LnyKmOzVXfMzzsaesaq8mrhuynI1IlHZuktmy/VA34T8g1NRVmDu8qD0Z1TPuStpn9v2aQt3BLiO9kUu/4Ot4KjITizSWr+PNSOh6mu3TK4GLk3rfg8wRH28F40jonol6p+yQfVdqA8AKrcGUubN8LkLmZBFBZUvlg8gUc1C8DLCWWoyInlXZ8fz8son8FdQyvufauZemmVX5WlRP1a4q9+6ez0Ga8kWElnUV2oPLiCZRbdjZNGaDbV6ejNo7lI0kcUnUScCzCeebKr35LapW7wsX0GtfyLGb/0S98tt1Vm027IImyasIsZTKr2sN9p8nkW98KtIIRWak0+zOAN5I+cbZZU/HIr/NJEm8mPv/B1E/nRvoU0ZMPwbPmu5tSK2P0Z5pEhcOfhWtuE4x6tcmiYOCeLOKtyPqfxuKmTwvZmehhjvrKVeFg2OGH0AtE+LQUb5Svobax19M6+GprqNfAucYyNEou7wT57uGto96DzJ1tiJMkEroZqNG2JhkM+TDnIgyeooKf9dnnzkXsX6PUi5G0jHDZ6F5ZM2dn0e+vm+i8FLPQgAp9Ms8sI19LerD/xDtrZzrs7/+zBGIYXsZIWOgykwRLCQTyP89B7VIcKFrag5MIgLibNSD08JWJkbS2UinoTbxvkbvRWfhGwUuQawk9Pka+mmPmzG6GKn6dgRkCbObqE4jOvtMVAC5mGBeLFRtZ792Go3X+4ELEEniiZgaGxdnnop6b/Zyv4JW4BzJndDi4SykGrrOjXLvvR54PWo52PeeOf12gH3jv4B21XEeZbtwrG4KCe8lKG4X58f1+1p7hRGCVptG/Tu+j0iFeCHKwz7NGNpf7nCCkJXFjPQCsiNq9b4D6T0HHaB/EHEF11CS3VfLMAk9OO9DgjdGMAvagTcznEalPedl37dz9Dt+zzBihNm7pm6N2lychbo1e2PJInJkFDU1ehvaY86LVd8naQYzj86GeRLFO8F6ofgrNA8cUuo7yjD5TKLUUM/8c9HE6UTTxWUZS5B/eCVKsN0VaUEL3rCYmg5gT6OFahtE31+K/JaNaczg2oS8EVXc/1N2fF4rn9uE82/3RG7DTjSPGb4fxeXKFKDvaiPYucLaaRtEVz+H1gtXixBTwncAX0KZKtdHv1mmVbwd5GnvJ6F2gy9DExMatx70dY8g3+4thM1ByiJoEIRtFxS/tc+WEjZf78moYVDffbY8yiRwEG72dqj0Yye6068y7tJ0PTKzPkHYSsm/bXKgVDcpQxzuiAViGcrafz3BfLaJmFqs4kUItDf5e5C/U6bGrfGCsiei9beneEdYC+HpSFOXKRvm/1AGkzKGSZTfITr6arpTth+bXDui1LLL0X7cO0avmyp30WW/zU6bi/EmjzYPdwI+hqrpj0PC5u19G5mPFtzbkTZ8CxK2vsancvC8nEF7NnwXCVuKIIHQtPXbhCqBMmnp/0PZNJxhM2IPlE3yFLpX9W2SJp6QZ6CNM36HJrBt/hHCDZ6iN9pvhHCdE7njO6D9zF6Ddu6M0cgS8GIyjujxzyAN/0j03WWZoHEm0QdRxTY03kN8Eeqpciihp2RZrmcWyipwEITuqSjesi3dbYeeN62MU9GONZdmj9R5+fMz0f/tohb9jU3F+Ls2QXGzXdFuQwch9tEouoYY8Zidh8IvF2fPyzYxfT4r0YJwRHa8yJe3EH4TZcNYg5fRJQDKLXAQhG4NIlK65dPlYVPNmeegVu2XIXPrNsSO/ZSQ5TJfWINiYE8AHo9KkuLaPycMNBqDvBa/BbUb+CKi/su2U1Hsrz0BjfWewGPMDmQTvc+Ez0mIjZ2KXistyi5wECbHjohhfC6dZZH4JjXLtfSONfkC1wdQh6rHEIV+Hgo53Iq2In6Y2YHi2I9wuGI0eyzJHk9AZvOByAcbA5ajfeZieLPGZnFETzovGo+g/MET0T7sfq1Mwhafz0tR0P3JhFzO/PXGC+4nUNKyj5VJWycxCAIHgT1biSbQywgFqJ0QG0VMVwxrPZit+Yredy8Syhk0gR6Ini9GQrQtMhP9nUWLRqxxW1lY8ovE74H/Qtkl12XHHDgukwZwYfEmqJX6R7L/i+6PBWsD6lnyt9nxgRA2GJziTZtRdwF/goKzr6c9TbcWaaNdCQLcSJDyZlvss8Va0u/bKnt0gvx3NzMZDecQ+j5egTTvZ1G/EaNsFLmvbQL1TzkOsZGgcWgkbA+jbJgvZ8fLlOfZFIMicBAG/DGUSfF71IA0fi2F2OE+A8Wd9kFOdv59jUzOZqZoK5qj6POtlBSlzs+LxTkoQ+ds5K9BqPkqU2A/TjYHpfO9gdnB7EbkyG/QHgEXELRaWa6tJQyKSRkjvmlHEla6VsiUtSgL4Vhk4r0U+QF5eKLWco9eYSb3SE3EB1ED0/9E7QdN8TtvsEyrfpxyB1rwTkC1bNDYhCT77BXAK5D/XKYAfVsoW+C7FXgSusfGPiiIbdu+aKLNoILLdwDno0LME7LPPRN14L0OESCj2fe7V8ZM9t2uSOjmympyZYrQaMmLh8+jhnzEGxBT+hLUFuFY4GeE7X1dNVEmYXOW/hQa/4+hsX4Wsyv187C74FSt5zPgwgaDqeFi2KzYHK32bkxaFLfJH/8mmrS/io49F7UT2AaRNE9E9Hzqu/I7m8bIP0/F7Extp/zI+5CA/RYtBN9CC0seZc0HtX9s//vlqHRq7+z1RhaJNw55APgourf+zrJdZ1sYdIGDcBNG0Q39G0StN8pMiauB70EpXp9FkzzGZii7Yw3yM7ZGscDtsuPdwo1IsG5DxM4NqIbrSmQGG3FRaRknXj6hGhS4fxcyB6H5ffH3XI36rthfK+Oi0jaGQeBg9o3eC5kgT8mONbrBse9wFUrvOgltDF+EpShheAUS7KXAlkgjLkEr88ZIWBcTij7vRoTGfUiIHkZ+2AMoifq+7HneHHTvzbL5ZTHyPhqIDf4YErgVBEY1pdXiQDaE1LObmU3+DDyGReBg9k3fBHXfPRwJwcNICFI3O3bMQcJ2AiJj7sqOLc6+312rmsG+h8/J5mcrAmOCJB88LyMcknDO5xjS/Mcimt8xR/cPbcRAgvzUt6I+JVC+IP2cMUwCZ8RB0BejlKZWtF3ep7gNZWicRegU7UkTC0HMJraCVA7lXPMye42UoO2HWOMjovelEsUNL0Lu2PYtVMVxc/SZMi82HWEYBQ5m37CtETP5FygU0ErCb0yu3IImw5moM1j8G/H7hxlFBNDmKJ75fFTBAOnekHnE4/s/qCL/1Oz5wGSNdIJhFTgjNknWoBYOf5I9z5uSecQrMMjv+iXy876NfLL8b/l7h0EAY3M4LwA7oITh5xOqy5tl7sREFchf/ThwCtJqZUw96zqGXeAg+FMWnoNRzt6a7PUN1PehjxEXffr5PShr5Sso++Ge3GfczGfQnP2iWrxNEPHxHCRouyLCCMI1NspaismpSbRg/R0hz9NNagdprDrCQhA4I9Z2i5Bv94eomSg0duyhfoWOj38KpVetQyU9saNvDWnBLdOkivM247giiH19Gqpo+ABhnAyPR6Nc1qns4aTqS1A1wOnR7w+lr1aEhSRwRhw83RKttC9FJSHQ2NE3GvmBX0Om55UohpTPioj7I/aSKKnl/kL9RF+OKjG2QBt9HJT4nlZ94HhxuhD4d9TEKf5smRafnmAhCpwRpwitBl6NArTLove0InwQYmSxSfYo0nb3oEyWi1BaVjs9N1NC0gjtBodXIvPw+agubxVq4WBMEPyyZueQGqtzkY92NqFJUVz2tOCwkAUOQs8SC8ETkY93NGpaY7+uGSEQo1EB6/0olvcDlKZ1FcosWYsEdJLuxp0WIZN2I7SQ7IBaVjwHlcUsATZFQXrDZqCLZRvBOZJxOdFjaGH5O6Tp46Tq0vSH7BcWusAZeYashlKR3o0qzV3n5hW/lbImm1VF2f7x++5FgncLYj/vyZ7fjSbsBGHiGrFZNoKIjS2yc90SUfZ7oDS0pTTW1BacVgteTQjFPu81SMDeS6guh0qrzUIlcLOR8i32AN6Ekpp3zY5ZkNpp8xD7a70u90mdSxwLa+Vc4swXLzjW1heiouBHo/cvWD+tEQapALUXiCeH/bHLUcHr9sD+yOR8Tf1Hm07iZpM7lW3S7mTN/0aRYLdKCqW+awRp4lNRmdNFBFMxthQqQUug0nDN4Zo4T6qNkC+0G2rzsD/1/hrM3n+t7HWHsfkL6d1obkXlTGcik/F30esLJo42V1QarjlMIlhwHkNkx1UonrQCERGvQvmEWyD2LyYcJgjar6j+rZewgFnI3GnaWI+SuG9GQnY+ErLYjzSJNEVFhrSMSuBaR9xJy7G8aURsXEjIs1yNaPa90AYbq6kvYI21QWyqdduvm8k9fMwCFgvZz1D787uQgJ1PfX0gBG09zQBXXvcLlcC1j5R/EgvhNYTqghFgdxTb2hwF1/cg9PKYbxT5ao8CP0Ft3e9A2uuH1OeHxj3+fc0V2zgHVALXHcQTMq6Fm0CT+hfRe1ciwRtDMbDtkEA+HVWTL+nSOT2IzMJrkPl7LfK71qOY4C3MriaHoPVM+1fC1WVUAtd95BvIxqTJJDLZ7sp9pobImEXR+5eg+Nlywp7mMLtAdRRpq4eQf/VY9NiQ/d56ik0/+5OxTzdUBZ9lQyVw8wsHlD2J875a7F+tyx4xbqF7qDHb9I2FrEKPUAlcb9EsPjUfpEmrv12hB6gErlyoBGLIUfaAbIUKQ4VK4CpU6CEqgatQoYeoBK5ChR6iErgKFXqISuAqVOghKoGrUKGHqASuQoUeohK4ChV6iP8FQzx3/YnBAcsAAAAASUVORK5CYII=" },
+  { name: "triangle", uri: "data:image/png;base64,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" },
+];
+
+function symbolHTML(armIdx) {
+  // armIdx is a LOGICAL arm; S.symbolMap[armIdx] is the symbol assigned to it
+  // this session (random per participant). Falls back to identity if unset.
+  const s = S.symbolMap ? S.symbolMap[armIdx] : armIdx;
+  return `<div class="slot-body celtic"><img class="celtic-symbol" src="${SYMBOLS[s].uri}" alt=""></div>`;
+}
+
+// Per-participant random screen layout. Returns a permutation of [0,1,2] where
+// slotOrder[s] is the LOGICAL arm shown at screen slot s (left→right). Drawn from
+// the per-session seed, so placement varies per participant and is reproducible.
+function shufflePositions() {
+  const a = [0, 1, 2];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// ── Build symbol grid ─────────────────────────────────────────
+// Screen slots are laid out left→right; slot s shows LOGICAL arm S.slotOrder[s].
+// slotOrder is randomized per session, so symbol placement varies per participant.
+// data-arm carries the LOGICAL index, so clicks and scoring stay in schedule terms.
+function buildSlotGrid(disabled=false, chosenArm=-1, points=null, outcome=null) {
+  if (!S.symbolMap) S.symbolMap = shufflePositions();   // logical arm → symbol  (random per session)
+  if (!S.slotOrder) S.slotOrder = shufflePositions();   // screen position → arm (random per session)
+  return `
+    <div class="slot-grid">
+      ${S.slotOrder.map((L) => {
+        const isChosen = L === chosenArm;
+        const dimmed   = disabled && !isChosen;
+        let reward = `<div class="slot-reward hidden">–</div>`;
+        if (isChosen && points !== null) {
+          const cls = outcome === 'reward' ? 'win' : 'loss';
+          const sign = points > 0 ? '+' : '';
+          reward = `<div class="slot-reward ${cls}">${sign}${points} pts</div>`;
+        }
+        return `
+          <div class="slot-machine${disabled?' disabled':''}${dimmed?' dimmed':''}"
+               data-arm="${L}"
+               style="opacity:${dimmed?'0.35':'1'}">
+            ${symbolHTML(L)}
+            ${reward}
+          </div>`;
+      }).join('')}
+    </div>`;
+}
+
+// ── Inactivity timer ─────────────────────────────────────────
+const INACTIVITY = {
+  NUDGE_MS:     15000,
+  HARD_STOP_MS: 45000,
+  _nudgeTimer:  null,
+  _stopTimer:   null,
+  _countInterval: null,
+};
+
+function inactivityClear() {
+  clearTimeout(INACTIVITY._nudgeTimer);
+  clearTimeout(INACTIVITY._stopTimer);
+  clearInterval(INACTIVITY._countInterval);
+  INACTIVITY._nudgeTimer = INACTIVITY._stopTimer = INACTIVITY._countInterval = null;
+  const nudge = document.getElementById('inactivity-nudge');
+  if (nudge) nudge.classList.remove('visible');
+}
+
+function inactivityHardStop() {
+  inactivityClear();
+  if (S.data.length === 0) return;
+  exportCSV();
+  jsPsych.endExperiment();
+  const display = document.querySelector('.jspsych-display-element') || document.body;
+  display.innerHTML = `
+    <div class="end-wrap" style="padding-top:100px">
+      <div class="end-title" style="color:var(--red)">Task Ended — Inactivity</div>
+      <div class="end-score">Score so far: ${S.score} pts</div>
+      <div class="end-stat">Trials completed: ${S.trial} / ${CFG.N_TRIALS}</div>
+      <div class="end-note">Your responses have been submitted.</div>
+    </div>`;
+}
+
+function inactivityShowNudge() {
+  const nudge = document.getElementById('inactivity-nudge');
+  if (!nudge) return;
+  nudge.classList.add('visible');
+  let remaining = INACTIVITY.HARD_STOP_MS / 1000;
+  const countEl = document.getElementById('nudge-countdown');
+  if (countEl) countEl.textContent = `Task will end in ${remaining}s`;
+  INACTIVITY._countInterval = setInterval(() => {
+    remaining--;
+    const el = document.getElementById('nudge-countdown');
+    if (el) {
+      el.textContent = `Task will end in ${remaining}s`;
+      if (remaining <= 10) el.classList.add('urgent');
+    }
+    if (remaining <= 0) clearInterval(INACTIVITY._countInterval);
+  }, 1000);
+  INACTIVITY._stopTimer = setTimeout(inactivityHardStop, INACTIVITY.HARD_STOP_MS);
+  const btn = document.getElementById('nudge-dismiss');
+  if (btn) btn.onclick = () => { inactivityClear(); inactivityStart(); };
+}
+
+function inactivityStart() {
+  inactivityClear();
+  INACTIVITY._nudgeTimer = setTimeout(inactivityShowNudge, INACTIVITY.NUDGE_MS);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Stimulus RNG + image helpers  (kept SEPARATE from the outcome RNG)
+// ═══════════════════════════════════════════════════════════════
+// rand() drives the reproducible reward schedule and its call ORDER must not change.
+// All stimulus / cosmetic randomness (food-set assignment, which pictures are drawn,
+// corner tilt, bonus placement) uses srand(), a second seed-derived stream, so adding
+// stimuli never shifts the bandit schedule for a given seed.
+const _srng = makeRNG((SEED ^ 0x9E3779B9) >>> 0);
+function srand() { return _srng(); }
+function srandInt(lo, hi) { return Math.floor(srand() * (hi - lo + 1)) + lo; }
+
+// This session's win-food set (sweet vs savory), assigned once, reproducibly.
+function foodSet() {
+  if (!S.foodSet) S.foodSet = (srand() < 0.5) ? 'sweet' : 'savory';
+  return S.foodSet;
+}
+function winSet() { return foodSet() === 'sweet' ? IMG.win_sweet     : IMG.win_savory; }
+function winDir() { return foodSet() === 'sweet' ? IMG.win_sweet_dir : IMG.win_savory_dir; }
+
+// Draw n image PATHS from a (files, dir) set using srand(): without replacement when
+// possible, else with replacement. Returns [] if the set is empty.
+function drawImages(files, dir, n) {
+  if (!files || files.length === 0) return [];
+  const pool = files.slice(), out = [];
+  for (let i = 0; i < n; i++) {
+    if (pool.length === 0) pool.push(...files);
+    const idx = Math.floor(srand() * pool.length);
+    out.push(encodeURI(dir + pool.splice(idx, 1)[0]));
+  }
+  return out;
+}
+function drawImage(files, dir) { const a = drawImages(files, dir, 1); return a.length ? a[0] : null; }
+
+// <img> tag, or a labeled placeholder box if no real image is configured (test mode).
+function imgOrPlaceholder(path, cls, label) {
+  return path
+    ? `<img class="${cls}" src="${path}" alt="">`
+    : `<div class="${cls} img-placeholder">${label || 'image'}</div>`;
+}
+
+// Preload every configured image so cues / feedback do not flash in mid-trial.
+(function preloadImages() {
+  [...IMG.win_sweet.map(f => IMG.win_sweet_dir + f),
+   ...IMG.win_savory.map(f => IMG.win_savory_dir + f),
+   ...IMG.neutral.map(f => IMG.neutral_dir + f)]
+    .forEach(p => { const im = new Image(); im.src = encodeURI(p); });
+})();
+
+// Show the photodiode square only on direct-recording sessions.
+if (CFG.PHOTODIODE) { const _pd = document.getElementById('photodiode'); if (_pd) _pd.classList.add('on'); }
+// Flash the photodiode white at an event onset (no-op unless CFG.PHOTODIODE).
+function pdFlash() {
+  if (!CFG.PHOTODIODE) return;
+  const el = document.getElementById('photodiode');
+  if (!el) return;
+  el.style.background = '#fff';
+  setTimeout(() => { el.style.background = '#000'; }, 100);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Bandit feedback screen (points centered, four tilted corner items)
+// ═══════════════════════════════════════════════════════════════
+// Win: "+10 Points" (green) ringed by four food pictures from the assigned win set,
+// one per corner, each tilted a different small angle. Loss: "-10 Points" (red) with a
+// sad emoji in each corner. Cosmetic randomness uses srand() (schedule-safe).
+function buildBanditFeedback(points, outcome) {
+  const isWin = outcome === 'reward';
+  const sign  = points > 0 ? '+' : '';
+  const cls   = isWin ? 'win' : 'loss';
+  const corners = ['fb-tl', 'fb-tr', 'fb-bl', 'fb-br'];
+  const pics  = isWin ? drawImages(winSet(), winDir(), 4) : [];
+  const items = corners.map((pos, i) => {
+    const tilt  = srandInt(-13, 13);
+    const inner = isWin
+      ? imgOrPlaceholder(pics[i] || null, 'fb-food', foodSet())
+      : `<div class="fb-sad">${SAD_EMOJI}</div>`;
+    return `<div class="fb-corner ${pos}" style="transform:rotate(${tilt}deg)">${inner}</div>`;
+  }).join('');
+  return `<div class="fb-wrap">${items}<div class="fb-center ${cls}">${sign}${points} Points</div></div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Mini-MID "bonus round" trial  (one self-managed jsPsych trial)
+// ═══════════════════════════════════════════════════════════════
+// Sequence (driven by timeouts inside a single trial): "Bonus round!" -> cue
+// (food or neutral) -> jittered fixation (anticipatory delay) -> empty square
+// (adaptive response window) -> optional grace window -> feedback. A keypress is
+// classified by WHEN it lands: before the square = too_fast; within the window = hit
+// (+bonus); within the grace = late miss (RT still logged); none = no_response.
+// target_rt_ms is the latency from square onset and is the incentive-vigor measure.
+function makeBonusTrial(isFood) {
+  return {
+    type: jsPsychHtmlKeyboardResponse,
+    choices: "NO_KEYS",                       // keys handled manually below
+    stimulus: `<div class="bonus-stage"><div class="bonus-intro">Bonus round!</div></div>`,
+    on_load: () => {
+      S.inBonus    = true;                    // suspend q/Esc quit so "any key" can't quit the task
+      S.bonusCount = (S.bonusCount || 0) + 1;
+      if (S.bonusWindow == null) S.bonusWindow = CFG.WIN_START;
+
+      const stage    = document.querySelector('.bonus-stage');
+      const cueType  = isFood ? `food_${foodSet()}` : 'neutral';
+      const cuePath  = isFood ? drawImage(winSet(), winDir())
+                              : drawImage(IMG.neutral, IMG.neutral_dir);
+      const delayMs  = srandInt(CFG.DELAY_MIN_MS, CFG.DELAY_MAX_MS);
+      const windowMs = Math.round(S.bonusWindow);
+      const t0       = performance.now();     // all *_onset_ms below are ms since t0
+
+      let phase = 'intro';                    // intro -> cue -> delay -> target -> grace -> done
+      let responded = false;
+      let pressKey = '', rtMs = '', premRt = '';
+      let cueOnset = '', delayOnset = '', targetOnset = '', respTime = '', fbOnset = '';
+      const timers = [];
+      const T = (fn, ms) => { const id = setTimeout(fn, ms); timers.push(id); return id; };
+
+      const onKey = (e) => {
+        if (responded || phase === 'intro' || phase === 'done') return;
+        responded = true;
+        pressKey = e.key;
+        const now = performance.now();
+        if (phase === 'cue' || phase === 'delay') {        // before the square -> premature
+          premRt = Math.round(now - (t0 + cueOnset));
+          finish('too_fast');
+        } else if (phase === 'target') {                   // within the window -> hit
+          respTime = Math.round(now - t0);
+          rtMs     = Math.round(now - (t0 + targetOnset));
+          finish('hit');
+        } else if (phase === 'grace') {                    // after window, before feedback -> late miss
+          respTime = Math.round(now - t0);
+          rtMs     = Math.round(now - (t0 + targetOnset)); // still measured from square onset
+          finish('miss');
+        }
+      };
+      document.addEventListener('keydown', onKey, true);
+
+      // Resolve outcome -> update staircase -> log row -> show feedback -> end trial.
+      function finish(outcome) {
+        if (phase === 'done') return;
+        phase = 'done';
+        timers.forEach(clearTimeout);
+        document.removeEventListener('keydown', onKey, true);
+
+        const hit = outcome === 'hit';
+        if (hit)                         S.bonusWindow = Math.max(CFG.WIN_FLOOR, S.bonusWindow - CFG.WIN_STEP_DOWN);
+        else if (outcome !== 'too_fast') S.bonusWindow = Math.min(CFG.WIN_CEIL,  S.bonusWindow + CFG.WIN_STEP_UP);
+
+        const pts = hit ? CFG.BONUS_PTS : 0;
+        S.bonusScore = (S.bonusScore || 0) + pts;
+        S.bonusHits  = (S.bonusHits  || 0) + (hit ? 1 : 0);
+
+        S.data.push({
+          participant_id:            S.pid,
+          trial_type:                isFood ? 'bonus_food' : 'bonus_neutral',
+          bonus_trial_index:         S.bonusCount,
+          position_in_bandit_stream: S.trial,     // # bandit trials completed before this bonus
+          food_set:                  foodSet(),
+          cue_type:                  cueType,
+          food_bonus_cue:            isFood ? 1 : 0,
+          cue_image:                 cuePath || '',
+          cue_duration_ms:           CFG.CUE_MS,
+          anticipatory_delay_ms:     delayMs,
+          adaptive_window_ms:        windowMs,
+          target_response_key:       pressKey,
+          target_rt_ms:              rtMs,
+          premature_rt_ms:           premRt,
+          target_hit:                hit ? 1 : 0,
+          target_miss:               outcome === 'miss' ? 1 : 0,
+          target_too_fast:           outcome === 'too_fast' ? 1 : 0,
+          target_no_response:        outcome === 'no_response' ? 1 : 0,
+          bonus_points_earned:       pts,
+          bonus_cumulative:          S.bonusScore,
+          bonus_hit_rate:            parseFloat((S.bonusHits / S.bonusCount).toFixed(3)),
+          cue_onset_ms:              cueOnset,
+          delay_onset_ms:            delayOnset,
+          target_onset_ms:           targetOnset,
+          response_ms:               respTime,
+          feedback_onset_ms:         '',          // filled just below
+          seed:                      SEED,
+        });
+        const row = S.data[S.data.length - 1];
+
+        fbOnset = Math.round(performance.now() - t0);
+        row.feedback_onset_ms = fbOnset;
+        let msg;
+        if (hit) msg = `<div class="bonus-fb win">Congrats!</div><div class="bonus-fb-pts">+${CFG.BONUS_PTS} points</div>`;
+        else if (outcome === 'too_fast') msg = `<div class="bonus-fb warn">Too soon!</div><div class="bonus-fb-sub">Wait for the square.</div>`;
+        else msg = `<div class="bonus-fb warn">Next time respond faster.</div>`;
+        if (stage) stage.innerHTML = msg;
+        pdFlash();
+        T(() => { S.inBonus = false; jsPsych.finishTrial(); }, CFG.BONUS_FEEDBACK_MS);
+      }
+
+      // Run the sequence.
+      T(() => {                                              // cue
+        phase = 'cue'; cueOnset = Math.round(performance.now() - t0);
+        if (stage) stage.innerHTML = imgOrPlaceholder(cuePath, 'bonus-cue', isFood ? foodSet() : 'neutral');
+        pdFlash();
+        T(() => {                                            // anticipatory fixation
+          phase = 'delay'; delayOnset = Math.round(performance.now() - t0);
+          if (stage) stage.innerHTML = `<div class="bonus-fix">+</div>`;
+          T(() => {                                          // target square
+            phase = 'target'; targetOnset = Math.round(performance.now() - t0);
+            if (stage) stage.innerHTML = `<div class="bonus-square"></div>`;
+            pdFlash();
+            T(() => {                                        // window elapsed, no hit -> grace
+              if (responded || phase === 'done') return;
+              phase = 'grace';
+              if (stage) stage.innerHTML = `<div class="bonus-fix" style="visibility:hidden">+</div>`;
+              T(() => {                                      // grace elapsed -> no response
+                if (responded || phase === 'done') return;
+                finish('no_response');
+              }, CFG.GRACE_MS);
+            }, windowMs);
+          }, delayMs);
+        }, CFG.CUE_MS);
+      }, CFG.BONUS_INTRO_MS);
+    },
+    on_finish: () => { S.inBonus = false; },
+  };
+}
+
+// Build the bonus deck (16 food + 14 neutral) in a schedule-safe random order.
+function buildBonusDeck() {
+  const deck = [];
+  for (let i = 0; i < CFG.N_BONUS_FOOD; i++)    deck.push(true);
+  for (let i = 0; i < CFG.N_BONUS_NEUTRAL; i++) deck.push(false);
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = Math.floor(srand() * (i + 1));
+    [deck[i], deck[j]] = [deck[j], deck[i]];
+  }
+  return deck;
+}
+
+// Bandit-trial indices to insert bonuses after: spread across bins, buffered around
+// the reversal, no two within BONUS_MIN_GAP. Returns a sorted array.
+function buildBonusPositions(nBonus) {
+  const lo = CFG.BONUS_FIRST_AFTER, hi = CFG.N_TRIALS - 1, rev = CFG.REVERSAL_TRIAL;
+  const used = [];
+  const tooClose = (p) =>
+    Math.abs(p - rev) < CFG.BONUS_REV_BUFFER ||
+    used.some(u => Math.abs(u - p) < CFG.BONUS_MIN_GAP);
+  const binW = (hi - lo) / nBonus;
+  for (let i = 0; i < nBonus; i++) {
+    const a = Math.floor(lo + i * binW), b = Math.floor(lo + (i + 1) * binW);
+    let p, tries = 0;
+    do { p = srandInt(a, Math.max(a, b - 1)); tries++; } while (tooClose(p) && tries < 40);
+    used.push(p);
+  }
+  return used.sort((x, y) => x - y);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  jsPsych timeline
+// ═══════════════════════════════════════════════════════════════
+const jsPsych = initJsPsych({ display_element: 'jspsych-target', on_finish: () => {} });
+
+// ── 1. PID ────────────────────────────────────────────────────
+const pid_trial = {
+  type: jsPsychSurveyText,
+  preamble: `
+    <div class="bandit-title">Probabilistic Bandit Task</div>
+    <div class="bandit-subtitle">Reward-learning task</div>`,
+  questions: [{ prompt: 'Participant ID', name: 'pid', required: true, columns: 20 }],
+  button_label: 'Continue →',
+  on_finish: (data) => { S.pid = data.response.pid.trim(); }
+};
+
+// ── 2. Instructions ───────────────────────────────────────────
+const instructions_trial = {
+  type: jsPsychHtmlKeyboardResponse,
+  stimulus: `
+    <div class="instr-title">Instructions</div>
+    <div class="instr-body">
+      In this task you'll see three symbols. Choose one by clicking it with the
+      mouse. This is a hard task so go with your gut without overthinking it.<br><br>
+      After you choose, you'll either win 10 points or lose 10 points. Your goal
+      is to earn as many points as you can over the course of the task.<br><br>
+      The three symbols don't pay off equally. Some win more often than others,
+      and none wins every time. The same symbol can win on one trial and not the
+      next.<br><br>
+      Keep paying attention to how each one is doing throughout the entire task,
+      since the best choice may not always be obvious. There's no single right
+      choice.<br><br>
+      You'll only learn the symbols by trying them out, so explore and use what
+      you learn.<br><br>
+      Every so often a short <strong>Bonus round</strong> appears. You'll see a
+      picture, then a cross, then a white square. The moment the square appears,
+      press <strong>any key</strong> as fast as you can to earn bonus points. Wait
+      for the square: pressing too early doesn't count.<br><br>
+      The whole task takes about 20 minutes.<br><br>
+      Press <strong>Start</strong> when you are ready.
+    </div>
+    <div style="text-align:center">
+      <button class="bandit-btn" id="start-btn">Start</button>
+    </div>`,
+  choices: "NO_KEYS",
+  on_load: () => {
+    document.getElementById('start-btn').addEventListener('click', () => {
+      showHeader();
+      updateHeader();
+      jsPsych.finishTrial();
+    });
+  }
+};
+
+// ── 3. Trial unit ─────────────────────────────────────────────
+function makeTrialUnit() {
+  let _arm, _points, _outcome;
+
+  const choice = {
+    type: jsPsychHtmlKeyboardResponse,
+    stimulus: () => `
+      <div class="choice-prompt">Click a symbol to play</div>
+      ${buildSlotGrid(false)}`,
+    choices: "NO_KEYS",
+    on_load: () => {
+      S.started = true;        // q/Esc quit is now allowed
+      updateHeader();          // show the current trial number (no overshoot)
+      const t0 = performance.now();
+      inactivityStart();
+      let _choiceLate = false;  // flips true if the 4 s deadline passes before a click
+      // After CHOICE_DEADLINE_MS with no choice, nudge the participant; the trial
+      // still waits indefinitely for a click (inactivity system handles true stalls).
+      const _deadline = setTimeout(() => {
+        if (_quitting) return;
+        _choiceLate = true;
+        const p = document.querySelector('.choice-prompt');
+        if (p) { p.textContent = 'Please answer faster.'; p.style.color = 'var(--red)'; }
+      }, CFG.CHOICE_DEADLINE_MS);
+      document.querySelectorAll('.slot-machine').forEach(el => {
+        el.addEventListener('click', () => {
+          if (_quitting) return;
+          clearTimeout(_deadline);    // cancel the nudge once a choice is made
+          inactivityClear();
+          const arm = parseInt(el.dataset.arm);
+          const rt  = performance.now() - t0;
+          document.querySelectorAll('.slot-machine').forEach(m => {
+            m.classList.add('disabled');
+            m.style.pointerEvents = 'none';
+          });
+          el.classList.add('pulling');
+          _animTO = setTimeout(() => {
+            _animTO = null;
+            if (_quitting) return;          // aborted mid-animation
+            el.classList.remove('pulling');
+            const result = registerChoice(arm, rt, _choiceLate);
+            _arm     = arm;
+            _points  = result.points;
+            _outcome = result.outcome;
+            jsPsych.finishTrial();
+          }, CFG.ANIM_MS);
+        });
+      });
+    },
+    on_finish: () => { inactivityClear(); }
+  };
+
+  const feedback = {
+    type: jsPsychHtmlKeyboardResponse,
+    stimulus: () => buildBanditFeedback(_points, _outcome),
+    choices: "NO_KEYS",
+    trial_duration: CFG.FEEDBACK_MS,
+    on_load: () => { pdFlash(); },   // photodiode pulse marks outcome onset for iEEG
+  };
+
+  const iti = {
+    type: jsPsychHtmlKeyboardResponse,
+    stimulus: `<div style="min-height:200px"></div>`,
+    choices: "NO_KEYS",
+    trial_duration: CFG.ITI_MS,
+  };
+
+  return [choice, feedback, iti];
+}
+
+// ── Build timeline ───────────────────────────────────────────
+function buildTimeline() {
+  // Fix this session's food set (sweet or savory) once, before any image is drawn,
+  // so cue and feedback images are consistent and the choice is logged as food_set.
+  foodSet();
+
+  // Schedule the 30 bonus events: shuffled food/neutral deck assigned to spread-out,
+  // reversal-buffered bandit positions. Map: after bandit trial p, run bonus deck[i].
+  const deck      = buildBonusDeck();
+  const positions = buildBonusPositions(deck.length);
+  const insertAt  = new Map();                     // bandit-trial index -> isFood
+  positions.forEach((p, i) => insertAt.set(p, deck[i]));
+
+  // Build the stream one bandit unit at a time (fresh closure per unit), dropping a
+  // bonus trial in immediately after the scheduled bandit trials.
+  const tl = [];
+  for (let t = 1; t <= CFG.N_TRIALS; t++) {
+    tl.push(...makeTrialUnit());
+    if (insertAt.has(t)) tl.push(makeBonusTrial(insertAt.get(t)));
+  }
+  return tl;
+}
+
+// ── 4. End screen ─────────────────────────────────────────────
+const end_trial = {
+  type: jsPsychHtmlKeyboardResponse,
+  stimulus: () => {
+    document.getElementById('progress-fill').style.width = '100%';
+    const bandit  = S.data.filter(d => d.trial_type === 'bandit');
+    const n       = bandit.length;                                   // bonus rows excluded
+    const nWin    = bandit.filter(d => d.outcome === 'reward').length;
+    const nLoss   = bandit.filter(d => d.outcome === 'loss').length;
+    const taskDur = S.taskStart
+      ? ((performance.now() - S.taskStart) / 60000).toFixed(1) : '—';
+    return `
+      <div class="end-wrap">
+        <div class="end-title">Great work! You finished the task.</div>
+        <div class="end-score">Final score: ${S.score} pts</div>
+        <div class="end-stat">Trials completed: ${n}</div>
+        <div class="end-stat">Rewards: ${nWin} &nbsp;|&nbsp; Losses: ${nLoss}</div>
+        <div class="end-stat">Bonus hits: ${S.bonusHits || 0} / ${S.bonusCount || 0}</div>
+        <div class="end-stat">Total task time: ${taskDur} min</div>
+        <div class="end-note">Your responses have been submitted. Thank you!</div>
+      </div>`;
+  },
+  choices: "NO_KEYS",
+  on_load: () => {
+    exportCSV();   // save to Drive (or local fallback if no endpoint configured)
+  }
+};
+
+// ── Quit & save ───────────────────────────────────────────────
+let _quitting = false;
+let _animTO   = null;   // pending choice-animation timeout (cleared on quit)
+function quitAndSave() {
+  if (_quitting || !S.started) return;
+  _quitting = true;
+  if (_animTO) { clearTimeout(_animTO); _animTO = null; }
+  inactivityClear();
+  exportCSV();                    // no-op if no trials completed yet
+  jsPsych.endExperiment();
+  const saved = S.data.length > 0;
+  const display = document.querySelector('.jspsych-display-element') || document.body;
+  display.innerHTML = `
+    <div class="end-wrap" style="padding-top:100px">
+      <div class="end-title" style="color:var(--gold)">Task Ended Early</div>
+      <div class="end-score">Score so far: ${S.score} pts</div>
+      <div class="end-stat">Trials completed: ${S.trial} / ${CFG.N_TRIALS}</div>
+      <div class="end-note" style="margin-top:16px">${
+        saved ? 'Your responses have been submitted.'
+              : 'No trials were completed, so no data was saved.'}</div>
+    </div>`;
+}
+// q / Esc quit. Ignore when typing in a text field (e.g. the participant-ID box).
+document.addEventListener('keydown', (e) => {
+  const tag = (e.target && e.target.tagName) || '';
+  if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+  if (S.inBonus) return;   // during a bonus round any key is a valid response, not a quit
+  if (e.key === 'Escape' || e.key === 'q' || e.key === 'Q') {
+    e.preventDefault();
+    quitAndSave();
+  }
+});
+
+// ── Run ───────────────────────────────────────────────────────
+jsPsych.run([pid_trial, instructions_trial, ...buildTimeline(), end_trial]);
+</script>
+</body>
+</html>
