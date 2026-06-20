@@ -1,0 +1,62 @@
+variable,definition
+participant_id,Participant ID from the participant_id column or sub-<id> filename token.
+session,Session label from the session column or ses-<id> filename token.
+file_name,Source CSV filename for this run.
+file_path,Full path to the source CSV.
+file_md5,MD5 hash of the file (duplicate-run detection).
+task_version,TASK_VERSION stamped in the data rows.
+seed,RNG seed for the run.
+n_model_trials,Usable bandit trials (1..3 choice and reward/loss outcome) used for fitting.
+rho_estimated,True if rho was a free parameter; False if fixed at 1 (default).
+alpha_pos,M2 learning rate applied when the prediction error was >= 0 (gain).
+alpha_neg,M2 learning rate applied when the prediction error was < 0 (loss).
+alpha_pos_minus_alpha_neg,M2 asymmetry; positive means faster updating from gains. Interpret only where M2 beats M1.
+beta,M2 softmax inverse temperature; higher is more value-consistent/exploitative choice.
+rho,Reward sensitivity used in the update; fixed at 1 unless ESTIMATE_RHO is True (then weakly identified).
+neg_log_likelihood,M2 negative log-likelihood of observed choices; lower is better.
+aic,"M2 Akaike information criterion (k=3, or 4 if rho estimated)."
+bic,M2 Bayesian information criterion.
+pseudo_r2,"M2 McFadden pseudo-R^2 vs a uniform 3-way guess: 1 - NLL/(n*ln3). 0 = chance, 1 = perfect."
+pred_accuracy,Proportion of trials whose observed choice is the model's argmax-probability arm (M2).
+mean_p_chosen,Mean M2 predicted probability of the observed choice.
+optimizer_success,Whether the M2 optimizer reported convergence.
+optimizer_message,M2 optimizer message.
+M1_alpha_pos,M1 single learning rate (alpha_pos == alpha_neg).
+M1_beta,M1 softmax inverse temperature.
+M1_neg_log_likelihood,M1 negative log-likelihood.
+M1_aic,M1 AIC (k=2).
+M1_bic,M1 BIC (k=2).
+M3_alpha_pos,M3 positive learning rate (model with stickiness).
+M3_alpha_neg,M3 negative learning rate.
+M3_beta,M3 softmax inverse temperature.
+M3_kappa,M3 stickiness/perseveration on the previously chosen arm; positive = repeat regardless of value.
+M3_neg_log_likelihood,M3 negative log-likelihood.
+M3_aic,M3 AIC (k=4).
+M3_bic,M3 BIC (k=4).
+delta_aic_M2_minus_M1,M2 AIC minus M1 AIC. Negative => dual-alpha M2 preferred by AIC.
+delta_bic_M2_minus_M1,M2 BIC minus M1 BIC. Negative => M2 preferred by BIC.
+delta_aic_M3_minus_M2,M3 AIC minus M2 AIC. Negative => adding stickiness preferred by AIC.
+delta_bic_M3_minus_M2,M3 BIC minus M2 BIC. Negative => stickiness preferred by BIC.
+best_model_by_aic,Model with the lowest AIC among M1/M2/M3.
+best_model_by_bic,Model with the lowest BIC among M1/M2/M3.
+boundary_flags,"Free parameters sitting at an optimization bound, prefixed by model; railed estimates are weakly identified."
+n_boundary_flags,Count of boundary flags across M1/M2/M3.
+rho_identifiability_note,States whether rho was fixed at 1 (recommended) or estimated despite confounding with beta.
+mean_rt,Mean choice RT (s) across modeled trials.
+median_rt,Median choice RT (s) across modeled trials.
+trial,Trialwise: 1-indexed bandit trial number.
+swap_count,Trialwise: reversals completed before this trial (phase = swap_count + 1).
+choice_arm,Trialwise: chosen arm (screen position 1..3).
+reward,"Trialwise: 1 if rewarded, 0 if loss."
+is_optimal,Trialwise: 1 if the chosen arm was the current highest-probability arm.
+q_arm1_pre,Trialwise: pre-update value of arm 1 (left).
+q_arm2_pre,Trialwise: pre-update value of arm 2 (middle).
+q_arm3_pre,Trialwise: pre-update value of arm 3 (right).
+q_chosen_pre,Trialwise: pre-update value of the chosen arm.
+p_choose_arm1,Trialwise: model probability of choosing arm 1.
+p_choose_arm2,Trialwise: model probability of choosing arm 2.
+p_choose_arm3,Trialwise: model probability of choosing arm 3.
+p_chosen,Trialwise: model probability of the observed choice.
+prediction_error,Trialwise: rho*r - Q_chosen; the feedback-locked RPE regressor for iEEG.
+alpha_used,"Trialwise: alpha_pos or alpha_neg, by the sign of the prediction error."
+rt,Trialwise: choice reaction time (s).
