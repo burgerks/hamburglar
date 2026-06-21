@@ -1108,7 +1108,7 @@ def main():
             hold([big, sub] if sub.text else [big], CFG['BONUS_FEEDBACK_MS'])
 
         # Page text follows the approved instruction sheet verbatim.
-        INTRO = ("In this game you are going to earn points to spend later in the day.\n"
+        INTRO = ("In this game you are going to earn points.\n"
                  "You can earn points two different ways: a regular round and a bonus "
                  "round.\n\n"
                  "Press SPACE for next.")
