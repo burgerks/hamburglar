@@ -1,4 +1,4 @@
-# Bandit + mini-MID bonus (PsychoPy, v12)
+# Bandit + mini-MID bonus (PsychoPy, v13)
 
 PsychoPy port of the jsPsych task. Three-arm probabilistic bandit with two
 reversals and an interleaved adaptive-window mini-MID bonus block
@@ -8,7 +8,7 @@ export, plus a few hardware, timing, and provenance columns.
 ## Run
 
 ```
-python bandit_mid_task_v12.py
+python bandit_mid_task_v13.py
 ```
 
 A startup dialog collects participant ID, session, an optional seed (blank draws
@@ -83,7 +83,7 @@ folders fall back to a labelled box (cues) or a drawn sad face (losses).
   anticipatory fixation jittered 1500-3000 ms, outlined square (adaptive window),
   500 ms grace, feedback (1.5 s). A hit earns 15 points.
 - Adaptive window: starts 450 ms, hit shortens by 15 ms, miss lengthens by
-  30 ms, floored at 300 ms and capped at 600 ms (converges near 66.7% hits). A
+  30 ms, floored at 250 ms and capped at 600 ms (converges near 66.7% hits). A
   press up to 500 ms after the window closes is logged as a miss but keeps its
   target RT, so slow responses still contribute a response time.
 
@@ -113,8 +113,9 @@ any exit). Rows are in chronological order; `trial_type` is `bandit`,
 alignment.
 
 Note: `task_version` is written from the `TASK_VERSION` constant near the top of
-the script. Set it to match the file version (it ships as `v9` in this build;
-update it to `v10`).
+the script (`v13` in this build) and is stamped into every data row. The `.log`
+also records the staircase configuration (start, floor, ceiling, steps) once at
+startup, so the floor actually used can be verified per run.
 
 ## Reproducibility
 
@@ -131,3 +132,18 @@ phase-stratified and lab-specific, so it no longer follows the web deck order;
 and the `sweet+savory` food set draws an extra value per image to pick a folder,
 so single-folder sets reproduce exactly as before while `sweet+savory` has its
 own draw pattern.
+
+## iEEG notes
+
+- Triggers: every event sends the same marker, a comma. Choose `serial` (writes
+  the byte `,` = 0x2C to the configured port) or `parallel` (writes the comma
+  byte 44). With no device present the marker is logged only. Event identity is
+  preserved in the `.log` labels and in the data file via `trial_type` and the
+  onset-time columns. The event set includes the new `anticipation` marker for
+  the pre-feedback fixation. If your recording system needs a different transport
+  or a distinct code per event, that is a small change in the `Triggers` class
+  and `EVENT_CODES`.
+- Photodiode: a white square pulses bottom-right at every event onset (choice,
+  anticipatory fixation, outcome, cue, target square, feedback). Reposition or
+  resize `pd_stim` for your sensor.
+- Timing is frame-locked; onset timestamps in the data are flip times.
